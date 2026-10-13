@@ -147,3 +147,10 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Roomora build and browser testing
+node_modules/
+dist/
+*.tsbuildinfo
+playwright-report/
+test-results/

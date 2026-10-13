@@ -1,0 +1,248 @@
+import { test, expect } from "@playwright/test";
+test("édition, annuler/rétablir, persistance et export complet", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Canapé 2.2 × 0.9 m" }).click();
+  await expect(page.getByText("Votre meuble", { exact: true })).toBeVisible();
+  await page.getByLabel("Nom", { exact: true }).fill("Canapé test");
+  await page.getByLabel("Largeur", { exact: true }).fill("2.4");
+  await expect(page.getByLabel("Largeur", { exact: true })).toHaveValue("2.4");
+  await page.getByRole("button", { name: "Dupliquer", exact: true }).click();
+  await expect(page.locator("footer")).toContainText("7 meubles");
+  await page.getByTitle("Annuler · ⌘Z").click();
+  await expect(page.locator("footer")).toContainText("6 meubles");
+  await page.getByTitle("Rétablir · ⌘⇧Z").click();
+  await expect(page.locator("footer")).toContainText("7 meubles");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator("footer")).toContainText("7 meubles");
+  const dl = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Exporter", exact: true }).click();
+  expect((await dl).suggestedFilename()).toContain(".zip");
+  await page.screenshot({ path: "/tmp/roomora-plan.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+test("modèle glTF intégré, rendu 3D et bibliothèque personnelle", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  const bytes = Buffer.from(
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 1]).buffer,
+  );
+  const gltf = {
+    asset: { version: "2.0" },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    buffers: [
+      {
+        uri: "data:application/octet-stream;base64," + bytes.toString("base64"),
+        byteLength: 36,
+      },
+    ],
+    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 36 }],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+        min: [0, 0, 0],
+        max: [1, 1, 1],
+      },
+    ],
+  };
+  await page.locator('input[type=file][accept=".glb,.gltf"]').setInputFiles({
+    name: "test.gltf",
+    mimeType: "model/gltf+json",
+    buffer: Buffer.from(JSON.stringify(gltf)),
+  });
+  await expect(page.getByLabel("Nom", { exact: true })).toHaveValue("test");
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  await expect(page.locator("canvas")).toBeVisible();
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: "/tmp/roomora-3d.png", fullPage: true });
+  await page.getByRole("button", { name: "Mes meubles", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "test 1 × 1 m" }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+test("création de projet et murs à l’échelle", async ({ page }) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Appartement · 48/ }).click();
+  await page
+    .getByRole("button", { name: "Nouvel appartement", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Tracer des murs" }).click();
+  const svg = page.locator(".plan-svg"),
+    box = await svg.boundingBox();
+  if (!box) throw Error("Plan absent");
+  await svg.click({ position: { x: box.width * 0.25, y: box.height * 0.3 } });
+  await svg.click({ position: { x: box.width * 0.6, y: box.height * 0.3 } });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Sélectionner", exact: true }).click();
+  await expect(page.locator(".plan-svg line")).toHaveCount(1);
+  await svg.click({ position: { x: box.width * 0.425, y: box.height * 0.3 } });
+  await expect(page.getByLabel("Longueur", { exact: true })).toBeVisible();
+  await page.getByLabel("Longueur", { exact: true }).fill("4");
+  await expect(page.getByLabel("Longueur", { exact: true })).toHaveValue("4");
+});
+
+test("plan PDF, calibration et restauration ZIP avec un modèle GLB", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  // Build a self-contained GLB with a triangle, using the official binary layout.
+  const binary = Buffer.from(
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 1]).buffer,
+  );
+  const model = {
+    asset: { version: "2.0" },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    buffers: [{ byteLength: 36 }],
+    bufferViews: [{ buffer: 0, byteLength: 36 }],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+        min: [0, 0, 0],
+        max: [1, 1, 1],
+      },
+    ],
+  };
+  const json = Buffer.from(JSON.stringify(model));
+  const padded = Buffer.alloc(Math.ceil(json.length / 4) * 4, 32);
+  json.copy(padded);
+  const glb = Buffer.alloc(28 + padded.length + binary.length);
+  glb.writeUInt32LE(0x46546c67, 0);
+  glb.writeUInt32LE(2, 4);
+  glb.writeUInt32LE(glb.length, 8);
+  glb.writeUInt32LE(padded.length, 12);
+  glb.writeUInt32LE(0x4e4f534a, 16);
+  padded.copy(glb, 20);
+  glb.writeUInt32LE(binary.length, 20 + padded.length);
+  glb.writeUInt32LE(0x004e4942, 24 + padded.length);
+  binary.copy(glb, 28 + padded.length);
+  await page.locator('input[accept=".glb,.gltf"]').setInputFiles({
+    name: "Triangle.glb",
+    mimeType: "model/gltf-binary",
+    buffer: glb,
+  });
+  await expect(page.getByLabel("Nom", { exact: true })).toHaveValue("Triangle");
+  // Minimal valid PDF with one vector plan page and an accurate xref table.
+  const stream = "0.8 w 30 30 200 130 re S";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> /Contents 4 0 R >>",
+    "<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((o, i) => {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(pdf);
+  pdf +=
+    "xref\n0 5\n0000000000 65535 f \n" +
+    offsets
+      .slice(1)
+      .map((n) => String(n).padStart(10, "0") + " 00000 n \n")
+      .join("") +
+    `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  await page
+    .locator('input[accept=".pdf,.png,.jpg,.jpeg,.webp"]')
+    .setInputFiles({
+      name: "plan.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(pdf),
+    });
+  await expect(page.locator(".plan-svg image")).toBeVisible();
+  const svg = page.locator(".plan-svg"),
+    box = await svg.boundingBox();
+  if (!box) throw Error("Plan absent");
+  page.once("dialog", (d) => d.accept("4"));
+  await svg.click({ position: { x: box.width * 0.2, y: box.height * 0.55 } });
+  await svg.click({ position: { x: box.width * 0.55, y: box.height * 0.55 } });
+  await expect(
+    page.getByRole("status").filter({ hasText: "Échelle définie" }),
+  ).toBeVisible();
+  const dl = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Exporter", exact: true }).click();
+  const path = await (await dl).path();
+  if (!path) throw Error("Archive non téléchargée");
+  await page.locator('input[accept=".zip"]').setInputFiles(path);
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Projet et ressources restaurés" }),
+  ).toBeVisible();
+  await expect(page.locator(".plan-svg image")).toBeVisible();
+  await expect(page.locator(".plan-svg")).toContainText("Triangle");
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  await expect(page.locator("canvas")).toBeVisible();
+});
+
+test("meuble glissé dans le plan, placement contre un mur et interface mobile", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  const card = page.getByRole("button", { name: "Canapé 2.2 × 0.9 m" });
+  await card.click();
+  const item = page.locator(".plan-svg g[data-item]").last();
+  const rect = await item.boundingBox();
+  if (!rect) throw Error("Meuble absent");
+  const before = await page
+    .getByLabel("Position X", { exact: true })
+    .inputValue();
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    rect.x + rect.width / 2 + 60,
+    rect.y + rect.height / 2 + 20,
+    { steps: 8 },
+  );
+  await page.mouse.up();
+  await expect(page.getByLabel("Position X", { exact: true })).not.toHaveValue(
+    before,
+  );
+  await page.getByTitle("Annuler · ⌘Z").click();
+  await item.locator("rect").click();
+  await expect(page.getByLabel("Position X", { exact: true })).toHaveValue(
+    before,
+  );
+  await page
+    .getByRole("button", { name: "Placer contre le mur le plus proche" })
+    .click();
+  await expect(page.getByLabel("Position X", { exact: true })).not.toHaveValue(
+    before,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("button", { name: "Plan 2D", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: "/tmp/roomora-mobile.png" });
+});
