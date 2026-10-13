@@ -21,16 +21,28 @@ npm run preview
 
 Un appartement de 48 m² est disponible au premier lancement. Le menu du nom de projet permet de créer, renommer, ouvrir ou supprimer des appartements et restaurer une sauvegarde.
 
-## Recréer votre appartement
+## Recréer automatiquement votre appartement
 
-1. Ouvrez **Structure → Importer un plan PDF / image**. Formats PDF (première page), PNG, JPG et WebP ; limite 30 Mo.
-2. Cliquez sur deux points dont vous connaissez la distance, puis saisissez cette distance **en mètres**. Une largeur de 80 cm correspond à `0,80` m dans la boîte de calibration, ou `0.8` dans un champ numérique.
-3. Utilisez **Tracer des murs** : cliquez successivement sur les extrémités. Échap termine le tracé. Le magnétisme utilise une grille de 5 cm, les extrémités proches et l’alignement horizontal/vertical.
-4. Sélectionnez un mur pour régler sa longueur, son épaisseur, sa hauteur et sa couleur. Ajouter une porte ou une fenêtre se fait en cliquant sur un mur avec l’outil correspondant ; les propriétés règlent largeur, hauteur, décalage et allège.
-5. Avec **Définir une pièce**, cliquez sur les sommets de son contour, puis sur le premier point pour fermer. Cela crée le sol et calcule la surface. Les pièces sont définies explicitement, pas détectées automatiquement.
-6. Passez en **Vue 3D** pour inspecter le résultat. Les murs transparents permettent de voir à l’intérieur ; plafond, qualité graphique et capture PNG sont disponibles.
+1. **Déposez votre image/PDF dans l’espace central**, ou cliquez sur **Mon plan → 3D** dans la barre du haut.
+2. Indiquez la **surface intérieure totale en m²**, hors balcon/terrasse.
+3. Cliquez sur **Créer mon appartement en 3D**. Roomora analyse localement l’image dans un Web Worker, extrait les murs, recherche les contours fermés des pièces, propose les portes/fenêtres, estime l’échelle et ouvre la vue 3D. Aucun segment à tracer pour commencer. Un nouveau projet est créé ; l’ancien est sauvegardé et conservé.
+4. La bannière indique les ouvertures à vérifier. **Vérifier les ouvertures** ouvre leurs propriétés : confirmez une proposition, changez son type, ses dimensions ou supprimez-la si nécessaire.
 
-Les unités internes sont les mètres. Le plan importé reste un arrière-plan ; aucune reconnaissance approximative n’est présentée comme une mesure exacte. Le calibrage doit précéder le tracé : changer l’échelle du fond ne redimensionne pas les murs déjà créés.
+Formats PDF (première page), PNG, JPG et WebP ; limite 30 Mo. Le traitement utilise une copie réduite à 960 pixels sur le plus grand côté, sans envoyer le plan à un serveur et sans clé/API payante.
+
+### Ce qui est reconnu et ce qui reste estimé
+
+Le détecteur recherche les bandes de murs sombres, horizontales et verticales. Il écarte les traits fins de cotation et les petits caractères, raccorde les segments proches, puis retrouve les régions intérieures fermées. Les lignes fines à l’intérieur d’une rupture de mur suggèrent une fenêtre ; une rupture sans vitrage suggère une porte. Ces catégories sont des **propositions heuristiques**, pas une classification garantie : certaines ruptures de dessin peuvent être interprétées comme des ouvertures.
+
+La surface saisie est répartie sur les contours des pièces détectées, avec une échelle uniforme `sqrt(surface / surface_en_pixels)`. Cela fournit des dimensions **estimées**, pas une lecture des cotes exactes. Une pièce oubliée, un balcon inclus ou une mauvaise segmentation fausse l’échelle. Les pièces sont nommées « Pièce 1 », etc. ; leurs noms ne sont pas lus automatiquement. Hauteur sous plafond et hauteur/allège des ouvertures utilisent des valeurs par défaut modifiables.
+
+Le détecteur est prévu pour des plans nets avec murs épais et orthogonaux. Les murs obliques, photos prises en perspective, traits très fins, hachures, dessins très chargés ou symboles inhabituels peuvent être mal reconnus. Les réglages avancés adaptent le contraste et l’épaisseur minimale. Si aucun contour exploitable n’est trouvé, une erreur est affichée et **aucun appartement fictif n’est généré**. L’image réelle de votre appartement doit être testée avant de considérer la reconstruction fiable.
+
+### Corrections et calibrage facultatif
+
+Les outils de **Structure** restent disponibles pour corriger un mur, ajouter une ouverture manquante ou ajuster une pièce. **Calibrer le plan** permet de choisir deux points avec une distance connue : sur un projet automatique, le bâti, les pièces et les positions sont recalibrés ensemble ; les dimensions réelles des meubles restent inchangées.
+
+Le mode manuel reste accessible sous **Je préfère utiliser le tracé manuel → Utiliser comme fond de plan**. Dans ce mode, calibrez avant de tracer ; les murs manuels déjà créés ne sont pas redimensionnés par un simple changement de l’échelle du fond.
 
 ## Aménager et importer vos meubles
 
@@ -73,7 +85,7 @@ npm run build                 # TypeScript et bundle de production
 
 Si Chromium est déjà installé : `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`.
 
-Les tests navigateur couvrent les commandes, le rechargement et l’export, le tracé précis, l’import glTF et GLB, un PDF rasterisé et calibré, la restauration ZIP et une vérification mobile. Chromium est vérifié dans l’environnement de développement ; Safari réel n’a pas été testé. La vue visite utilise Pointer Lock, dont la disponibilité varie selon le navigateur et l’appareil.
+Les tests couvrent la détection et les surfaces sur des plans synthétiques, les pièces concaves, le rejet des images non reconnues, le calibrage, les commandes, la persistance et les archives. Les essais navigateur couvrent aussi le parcours image + m² et PDF + m² vers la 3D, la vérification des ouvertures, l’import glTF/GLB, la restauration ZIP et l’interface mobile. Chromium est vérifié dans l’environnement de développement ; Safari réel n’a pas été testé. La vue visite utilise Pointer Lock, dont la disponibilité varie selon le navigateur et l’appareil.
 
 ## GitHub Pages et déploiement automatique
 
@@ -95,7 +107,8 @@ L’adresse attendue est `https://trueballknower.github.io/Roomora/` ; sa prése
 - `src/Plan.tsx` : fond de plan, calibrage, outils 2D et déplacement.
 - `src/Scene.tsx` : géométrie 3D, éclairage, caméras et interactions.
 - `src/imports.ts` : validation des modèles, URL et rasterisation PDF.
+- `src/AutoPlanImport.tsx`, `src/detection/` : import automatique, analyse locale en worker, segmentation et reconstruction.
 - `src/db.ts` : IndexedDB et sauvegardes portables.
 - `src/App.tsx`, `src/AssetImage.tsx`, `src/style.css` : interface et propriétés.
 
-La reconnaissance automatique de plans, OBJ/MTL, Draco/KTX2, favoris, textures de matériaux personnalisées, estimation de circulation et bibliothèque de modèles externes sous licence ne sont pas implémentés. Les pièces ne sont pas déduites automatiquement des murs. Les plafonds sont simplifiés. Le rendu des meubles intégrés est stylisé. Les gros modèles peuvent ralentir l’appareil et les archives importantes nécessitent de la mémoire. L’application fonctionne comme site statique sans backend ; elle n’installe pas encore de service worker pour une utilisation hors réseau après fermeture du serveur.
+La reconnaissance automatique est limitée aux plans orthogonaux suffisamment contrastés ; elle ne lit pas les cotes ou les noms des pièces et ne garantit pas les types d’ouvertures. OBJ/MTL, Draco/KTX2, favoris, textures de matériaux personnalisées, estimation de circulation et bibliothèque de modèles externes sous licence ne sont pas implémentés. Les plafonds sont simplifiés. Le rendu des meubles intégrés est stylisé. Les gros modèles peuvent ralentir l’appareil et les archives importantes nécessitent de la mémoire. L’application fonctionne comme site statique sans backend ; elle n’installe pas encore de service worker pour une utilisation hors réseau après fermeture du serveur.

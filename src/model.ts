@@ -7,6 +7,7 @@ export type Wall = {
   height: number;
   color: string;
   openings: Opening[];
+  detection?: { confidence: number; reviewed: boolean };
 };
 export type Opening = {
   id: string;
@@ -15,6 +16,7 @@ export type Opening = {
   width: number;
   height: number;
   sill: number;
+  detection?: { confidence: number; reviewed: boolean };
 };
 export type Item = {
   id: string;
@@ -42,6 +44,12 @@ export type Project = {
   rooms: Room[];
   plan?: { asset: string; width: number; height: number; scale: number };
   updated: number;
+  analysis?: {
+    surface: number;
+    estimated: true;
+    warnings: string[];
+    created: number;
+  };
 };
 export const uid = () => crypto.randomUUID();
 export const distance = (a: Point, b: Point) =>
@@ -346,4 +354,28 @@ export function againstWall(item: Item, walls: Wall[]): Item {
     y: wall.a.y + dy * t + dx * offset,
     rotation: (Math.atan2(dy, dx) * 180) / Math.PI,
   };
+}
+
+/** Calibrate automatically reconstructed structure while keeping real furniture dimensions. */
+export function calibrateAutomaticPlan(p: Project, factor: number) {
+  if (!p.plan || !p.analysis || !Number.isFinite(factor) || factor <= 0)
+    throw Error("Calibrage invalide.");
+  p.plan.scale *= factor;
+  const scale = (q: Point) => ({ x: q.x * factor, y: q.y * factor });
+  for (const w of p.walls) {
+    w.a = scale(w.a);
+    w.b = scale(w.b);
+    w.thickness *= factor;
+    for (const o of w.openings) {
+      o.offset *= factor;
+      o.width *= factor;
+    }
+  }
+  for (const r of p.rooms) r.points = r.points.map(scale);
+  for (const i of p.items) {
+    i.x *= factor;
+    i.y *= factor;
+  }
+  p.analysis.warnings[0] =
+    "Échelle recalibrée sur une distance connue. Les contours détectés restent à vérifier.";
 }

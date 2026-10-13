@@ -347,6 +347,29 @@ function Walk() {
   }, [camera]);
   return <PointerLockControls />;
 }
+function FitCamera({
+  id,
+  x,
+  y,
+  span,
+  walk,
+}: {
+  id: string;
+  x: number;
+  y: number;
+  span: number;
+  walk: boolean;
+}) {
+  const { camera } = useThree();
+  useEffect(() => {
+    if (!walk) {
+      camera.position.set(x + span * 0.9, span * 0.95, y + span * 1.1);
+      camera.lookAt(x, 0, y);
+      camera.updateProjectionMatrix();
+    }
+  }, [camera, id, walk, x, y, span]);
+  return null;
+}
 function DropFurniture() {
   const { gl, camera } = useThree();
   const { change, select } = useStore();
@@ -354,6 +377,7 @@ function DropFurniture() {
     const canvas = gl.domElement;
     const drop = (e: DragEvent) => {
       e.preventDefault();
+      if (e.dataTransfer?.files.length) return;
       e.stopPropagation();
       try {
         const raw = e.dataTransfer?.getData("roomora-item");
@@ -406,6 +430,21 @@ export default function Scene({
   onError: (s: string) => void;
 }) {
   const { project: p, selected, select, change } = useStore();
+  const bounds = useMemo(() => {
+    const points = p.walls.flatMap((w) => [w.a, w.b]);
+    if (!points.length) return { x: 4, y: 3, span: 8 };
+    const xs = points.map((q) => q.x),
+      ys = points.map((q) => q.y),
+      minX = Math.min(...xs),
+      maxX = Math.max(...xs),
+      minY = Math.min(...ys),
+      maxY = Math.max(...ys);
+    return {
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2,
+      span: Math.max(4, maxX - minX, maxY - minY),
+    };
+  }, [p.id]);
   const [drag, setDrag] = useState<{
     id: string;
     x: number;
@@ -443,6 +482,7 @@ export default function Scene({
       camera={{ position: [11, 10, 13], fov: 42 }}
       onPointerMissed={() => select(null)}
     >
+      <FitCamera id={p.id} {...bounds} walk={walk} />
       <DropFurniture />
       <color attach="background" args={["#e8eae6"]} />
       <ambientLight intensity={1.1} />
@@ -537,7 +577,7 @@ export default function Scene({
         <OrbitControls
           makeDefault
           enabled={!drag}
-          target={[4, 0, 3]}
+          target={[bounds.x, 0, bounds.y]}
           maxPolarAngle={Math.PI / 2 - 0.03}
         />
       )}

@@ -65,6 +65,7 @@ import {
 } from "./db";
 import { importPlan, importModel, importURL } from "./imports";
 import AssetImage from "./AssetImage";
+import AutoPlanImport from "./AutoPlanImport";
 import Plan, { type Tool } from "./Plan";
 const Scene = lazy(() => import("./Scene"));
 function download(blob: Blob, name: string) {
@@ -121,15 +122,24 @@ export default function App() {
     [ceiling, setCeiling] = useState(false),
     [quality, setQuality] = useState(false),
     [message, setMessage] = useState(""),
-    [saved, setSaved] = useState("Chargement…"),
+    [persisted, setPersisted] = useState<Project | null>(null),
+    [saveError, setSaveError] = useState(false),
     [loaded, setLoaded] = useState(false),
     [modal, setModal] = useState<
-      null | "projects" | "import" | "reference" | "help"
+      null | "projects" | "import" | "reference" | "help" | "autoPlan"
     >(null),
     [allProjects, setAllProjects] = useState<Project[]>([]),
     [personal, setPersonal] = useState<Item[]>([]),
     [busy, setBusy] = useState(false),
     [url, setUrl] = useState("");
+  const saved = !loaded
+    ? "Chargement…"
+    : saveError
+      ? "Échec de sauvegarde"
+      : persisted === p
+        ? "Enregistré"
+        : "Enregistrement…";
+  const [autoFile, setAutoFile] = useState<File>();
   const planInput = useRef<HTMLInputElement>(null),
     modelInput = useRef<HTMLInputElement>(null),
     backupInput = useRef<HTMLInputElement>(null);
@@ -158,16 +168,18 @@ export default function App() {
   }, [set, notify]);
   useEffect(() => {
     if (!loaded) return;
-    setSaved("Enregistrement…");
+    setSaveError(false);
     const t = setTimeout(
       () =>
         saveProject(p)
           .then(() => {
-            setSaved("Enregistré");
+            if (useStore.getState().project !== p) return;
+            setPersisted(p);
             localStorage.setItem("roomora-last", p.id);
           })
           .catch((e) => {
-            setSaved("Échec de sauvegarde");
+            if (useStore.getState().project !== p) return;
+            setSaveError(true);
             notify("Sauvegarde impossible : " + e.message);
           }),
       350,
@@ -327,6 +339,17 @@ export default function App() {
           </span>
         </div>
         <div className="header-actions">
+          <button
+            className="outline"
+            title="Créer automatiquement mon appartement depuis un plan"
+            onClick={() => {
+              setAutoFile(undefined);
+              setModal("autoPlan");
+            }}
+          >
+            <ImagePlus size={17} />
+            <span className="import-plan-label">Mon plan → 3D</span>
+          </button>
           <button title="Annuler · ⌘Z" disabled={!past.length} onClick={undo}>
             <Undo2 size={17} />
           </button>
@@ -388,7 +411,21 @@ export default function App() {
           </div>
           {tab === "build" ? (
             <>
-              <p className="section-label">CONSTRUIRE À L’ÉCHELLE</p>
+              <button
+                className="primary full"
+                onClick={() => {
+                  setAutoFile(undefined);
+                  setModal("autoPlan");
+                }}
+              >
+                <ImagePlus size={18} />
+                Créer la 3D depuis mon plan
+              </button>
+              <p className="small">
+                Déposez votre plan et sa surface. Roomora propose
+                automatiquement les murs, pièces et ouvertures.
+              </p>
+              <p className="section-label">CORRIGER OU AJUSTER</p>
               <div className="tool-list">
                 {[
                   ["select", "Sélectionner", MousePointer2],
@@ -419,19 +456,10 @@ export default function App() {
                 <ImagePlus size={18} />
                 Importer un plan PDF / image
               </button>
-              <p className="small">
-                1. Importez votre plan.
-                <br />
-                2. Calibrez une distance connue.
-                <br />
-                3. Tracez les murs et les contours des pièces.
-                <br />
-                4. Ajoutez portes et fenêtres.
-              </p>
               <p className="notice">
-                Le plan sert de référence visuelle. Les murs sont tracés et
-                mesurés par vous ; aucune reconnaissance approximative n’est
-                présentée comme exacte.
+                Les outils ci-dessus servent à corriger les propositions
+                automatiques ou à construire manuellement si votre image ne peut
+                pas être reconnue.
               </p>
             </>
           ) : (
@@ -581,6 +609,12 @@ export default function App() {
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) {
+              setAutoFile(file);
+              setModal("autoPlan");
+              return;
+            }
             try {
               const raw = e.dataTransfer.getData("roomora-item");
               if (raw) add(JSON.parse(raw));
@@ -643,6 +677,37 @@ export default function App() {
               </button>
             </div>
           </div>
+          {p.analysis && (
+            <div className="analysis-banner">
+              <span>
+                <strong>Appartement généré automatiquement</strong> ·{" "}
+                {p.rooms.length} pièces · {p.analysis.surface} m² renseignés
+              </span>
+              <small>
+                Dimensions estimées ·{" "}
+                {
+                  p.walls
+                    .flatMap((w) => w.openings)
+                    .filter((o) => o.detection && !o.detection.reviewed).length
+                }{" "}
+                ouvertures à vérifier
+              </small>
+              <button
+                onClick={() => {
+                  setView("2d");
+                  setTab("build");
+                  const w = p.walls.find((w) =>
+                    w.openings.some(
+                      (o) => o.detection && !o.detection.reviewed,
+                    ),
+                  );
+                  if (w) select(w.id);
+                }}
+              >
+                Vérifier les ouvertures
+              </button>
+            </div>
+          )}
           <div className="viewport">
             {view === "2d" ? (
               <Plan tool={tool} snap={snap} hide={hide} onMessage={notify} />
@@ -955,6 +1020,54 @@ export default function App() {
                       <X size={14} />
                     </button>
                   </h4>
+                  {o.detection && (
+                    <div className="opening-review">
+                      <p className="small">
+                        {o.detection.reviewed
+                          ? "✓ Ouverture vérifiée"
+                          : "Proposition automatique à vérifier"}{" "}
+                        · signal{" "}
+                        {o.detection.confidence >= 0.75
+                          ? "fort"
+                          : o.detection.confidence >= 0.55
+                            ? "moyen"
+                            : "faible"}
+                      </p>
+                      <label className="field">
+                        Type de l’ouverture
+                        <select
+                          value={o.kind}
+                          onChange={(e) =>
+                            change((p) => {
+                              const v = p.walls
+                                .find((w) => w.id === wall.id)!
+                                .openings.find((v) => v.id === o.id)!;
+                              v.kind = e.target.value as "door" | "window";
+                              v.sill = v.kind === "door" ? 0 : 0.9;
+                              v.height = v.kind === "door" ? 2.1 : 1.2;
+                            })
+                          }
+                        >
+                          <option value="door">Porte</option>
+                          <option value="window">Fenêtre</option>
+                        </select>
+                      </label>
+                      <button
+                        className="outline full"
+                        onClick={() =>
+                          change((p) => {
+                            p.walls
+                              .find((w) => w.id === wall.id)!
+                              .openings.find(
+                                (v) => v.id === o.id,
+                              )!.detection!.reviewed = true;
+                          })
+                        }
+                      >
+                        Confirmer cette ouverture
+                      </button>
+                    </div>
+                  )}
                   {num(
                     "Décalage",
                     o.offset,
@@ -1089,19 +1202,10 @@ export default function App() {
         accept=".pdf,.png,.jpg,.jpeg,.webp"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f)
-            run(async () => {
-              const plan = await importPlan(f);
-              change((p) => {
-                p.plan = plan;
-              });
-              setView("2d");
-              setTab("build");
-              setTool("scale");
-              notify(
-                "Plan importé. Calibrez une distance connue avant de tracer.",
-              );
-            });
+          if (f) {
+            setAutoFile(f);
+            setModal("autoPlan");
+          }
           e.target.value = "";
         }}
       />
@@ -1171,7 +1275,36 @@ export default function App() {
             >
               <X size={20} />
             </button>
-            {modal === "projects" ? (
+            {modal === "autoPlan" ? (
+              <AutoPlanImport
+                initial={autoFile}
+                onGenerated={async (next) => {
+                  await saveProject(useStore.getState().project);
+                  set(next);
+                  setView("3d");
+                  setTab("build");
+                  setTool("select");
+                  setTransparent(true);
+                  setModal(null);
+                  notify(
+                    `${next.walls.length} murs, ${next.rooms.length} pièces et ${next.walls.reduce((s, w) => s + w.openings.length, 0)} ouvertures proposés. Dimensions estimées ; vérifiez les éléments signalés.`,
+                  );
+                }}
+                onManual={async (file) => {
+                  const plan = await importPlan(file);
+                  change((p) => {
+                    p.plan = plan;
+                  });
+                  setView("2d");
+                  setTab("build");
+                  setTool("scale");
+                  setModal(null);
+                  notify(
+                    "Plan importé. Calibrez une distance connue avant de tracer.",
+                  );
+                }}
+              />
+            ) : modal === "projects" ? (
               <>
                 <span className="eyebrow">VOTRE ATELIER</span>
                 <h2>Mes appartements</h2>
@@ -1338,9 +1471,11 @@ export default function App() {
               <>
                 <h2>Bienvenue chez vous.</h2>
                 <p>
-                  Importez votre plan dans <strong>Structure</strong>, calibrez
-                  une distance connue puis tracez vos murs. Dessinez le contour
-                  de chaque pièce pour créer son sol.
+                  Déposez votre plan dans l’espace central ou ouvrez{" "}
+                  <strong>Mon plan → 3D</strong>. Indiquez la surface totale :
+                  Roomora propose automatiquement les murs, les pièces et les
+                  ouvertures. Les éléments signalés peuvent être corrigés dans
+                  Structure.
                 </p>
                 <p>
                   Ajoutez vos meubles depuis la bibliothèque, puis glissez-les

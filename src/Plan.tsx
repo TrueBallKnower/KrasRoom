@@ -7,6 +7,7 @@ import {
   area,
   segmentDistance,
   collides,
+  calibrateAutomaticPlan,
   type Point,
 } from "./model";
 export type Tool =
@@ -34,6 +35,22 @@ export default function Plan({
       point: Point;
     } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (!p.analysis || !p.walls.length) return;
+    const points = p.walls.flatMap((w) => [w.a, w.b]),
+      xs = points.map((q) => q.x),
+      ys = points.map((q) => q.y);
+    const minX = Math.min(...xs),
+      minY = Math.min(...ys);
+    setOrigin({ x: minX - 1, y: minY - 1 });
+    setZoom(
+      Math.min(
+        4,
+        12 / (Math.max(...xs) - minX + 2),
+        9 / (Math.max(...ys) - minY + 2),
+      ),
+    );
+  }, [p.id]);
   useEffect(() => {
     setPoints([]);
   }, [tool]);
@@ -164,7 +181,8 @@ export default function Plan({
       if (!Number.isFinite(real) || real <= 0)
         return onMessage("Saisissez une distance positive en mètres.");
       change((p) => {
-        p.plan!.scale *= real / len;
+        if (p.analysis) calibrateAutomaticPlan(p, real / len);
+        else p.plan!.scale *= real / len;
       });
       setPoints([]);
       onMessage(
@@ -207,6 +225,7 @@ export default function Plan({
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
+          if (e.dataTransfer.files.length) return;
           e.stopPropagation();
           try {
             const raw = e.dataTransfer.getData("roomora-item");
@@ -352,7 +371,13 @@ export default function Plan({
                   y1={w.a.y + dy * o.offset}
                   x2={w.a.x + dx * (o.offset + o.width)}
                   y2={w.a.y + dy * (o.offset + o.width)}
-                  stroke={o.kind === "door" ? "#f4f5f0" : "#88b3c2"}
+                  stroke={
+                    o.detection && !o.detection.reviewed
+                      ? "#d9aa62"
+                      : o.kind === "door"
+                        ? "#f4f5f0"
+                        : "#88b3c2"
+                  }
                   strokeWidth={w.thickness + 0.02}
                 />
               );

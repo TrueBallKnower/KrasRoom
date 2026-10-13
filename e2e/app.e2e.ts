@@ -174,6 +174,12 @@ test("plan PDF, calibration et restauration ZIP avec un modèle GLB", async ({
       mimeType: "application/pdf",
       buffer: Buffer.from(pdf),
     });
+  await page
+    .getByText("Je préfère utiliser le tracé manuel", { exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Utiliser comme fond de plan" })
+    .click();
   await expect(page.locator(".plan-svg image")).toBeVisible();
   const svg = page.locator(".plan-svg"),
     box = await svg.boundingBox();
@@ -245,4 +251,156 @@ test("meuble glissé dans le plan, placement contre un mur et interface mobile",
     ),
   ).toBe(true);
   await page.screenshot({ path: "/tmp/roomora-mobile.png" });
+});
+
+test("une image et 48 m² créent automatiquement murs, pièces, porte et fenêtre", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  const png = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 360;
+    c.height = 280;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, 360, 280);
+    ctx.fillStyle = "black";
+    for (const [x, y, w, h] of [
+      [25, 25, 310, 8],
+      [25, 247, 310, 8],
+      [25, 25, 8, 230],
+      [327, 25, 8, 230],
+      [200, 25, 7, 85],
+      [200, 140, 7, 115],
+    ])
+      ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "white";
+    ctx.fillRect(125, 25, 50, 8);
+    ctx.fillStyle = "black";
+    ctx.fillRect(125, 27, 50, 1);
+    ctx.fillRect(125, 30, 50, 1);
+    return c.toDataURL().split(",")[1];
+  });
+  const transfer = await page.evaluateHandle((base64) => {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)),
+      d = new DataTransfer();
+    d.items.add(
+      new File([bytes], "Appartement automatique.png", { type: "image/png" }),
+    );
+    return d;
+  }, png);
+  await page
+    .locator(".plan-svg")
+    .dispatchEvent("drop", { dataTransfer: transfer });
+  await transfer.dispose();
+  await page
+    .getByLabel("Surface intérieure totale", { exact: true })
+    .fill("48");
+  await page
+    .getByRole("button", { name: "Créer mon appartement en 3D", exact: true })
+    .click();
+  await expect(page.locator("canvas")).toBeVisible();
+  await expect(page.locator("footer")).toContainText(
+    "2 pièces · 48.0 m² · 0 meubles",
+  );
+  await expect(page.locator(".analysis-banner")).toContainText(
+    "2 ouvertures à vérifier",
+  );
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "/tmp/roomora-auto-3d.png" });
+  await page.getByRole("button", { name: "Vérifier les ouvertures" }).click();
+  await expect(page.getByLabel("Type de l’ouverture")).toHaveValue("window");
+  await page.getByRole("button", { name: "Confirmer cette ouverture" }).click();
+  await expect(page.locator(".analysis-banner")).toContainText(
+    "1 ouvertures à vérifier",
+  );
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator("footer")).toContainText("2 pièces · 48.0 m²");
+  await expect(page.locator(".analysis-banner")).toContainText(
+    "1 ouvertures à vérifier",
+  );
+  expect(errors).toEqual([]);
+});
+
+test("une image non reconnue conserve le projet existant sans fabriquer de murs", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  const png = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 100;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "white";
+    x.fillRect(0, 0, 100, 100);
+    return c.toDataURL().split(",")[1];
+  });
+  await page
+    .getByTitle("Créer automatiquement mon appartement depuis un plan")
+    .click();
+  await page.locator(".auto-import input[type=file]").setInputFiles({
+    name: "Vide.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(png, "base64"),
+  });
+  await page
+    .getByLabel("Surface intérieure totale", { exact: true })
+    .fill("48");
+  await page
+    .getByRole("button", { name: "Créer mon appartement en 3D", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("contour");
+  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  await expect(page.locator("footer")).toContainText(
+    "3 pièces · 48.0 m² · 5 meubles",
+  );
+});
+
+test("un PDF vectoriel et la surface suffisent aussi à générer la 3D", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  const stream = "8 w 30 30 240 140 re S 150 30 m 150 170 l S";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> /Contents 4 0 R >>",
+    "<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((o, i) => {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(pdf);
+  pdf +=
+    "xref\n0 5\n0000000000 65535 f \n" +
+    offsets
+      .slice(1)
+      .map((n) => String(n).padStart(10, "0") + " 00000 n \n")
+      .join("") +
+    `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  await page
+    .getByTitle("Créer automatiquement mon appartement depuis un plan")
+    .click();
+  await page.locator(".auto-import input[type=file]").setInputFiles({
+    name: "Deux pièces.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from(pdf),
+  });
+  await page
+    .getByLabel("Surface intérieure totale", { exact: true })
+    .fill("60");
+  await page
+    .getByRole("button", { name: "Créer mon appartement en 3D", exact: true })
+    .click();
+  await expect(page.locator(".analysis-banner")).toContainText("2 pièces");
+  await expect(page.locator("footer")).toContainText("60.0 m²");
+  await expect(page.locator("canvas")).toBeVisible();
 });
