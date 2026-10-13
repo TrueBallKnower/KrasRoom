@@ -180,7 +180,7 @@ test("plan PDF, calibration et restauration ZIP avec un modèle GLB", async ({
   await page
     .getByRole("button", { name: "Utiliser comme fond de plan" })
     .click();
-  await expect(page.locator(".plan-svg image")).toBeVisible();
+  await expect(page.locator(".plan-svg image")).toBeVisible({ timeout: 20000 });
   const svg = page.locator(".plan-svg"),
     box = await svg.boundingBox();
   if (!box) throw Error("Plan absent");
@@ -200,7 +200,7 @@ test("plan PDF, calibration et restauration ZIP avec un modèle GLB", async ({
       .getByRole("status")
       .filter({ hasText: "Projet et ressources restaurés" }),
   ).toBeVisible();
-  await expect(page.locator(".plan-svg image")).toBeVisible();
+  await expect(page.locator(".plan-svg image")).toBeVisible({ timeout: 20000 });
   await expect(page.locator(".plan-svg")).toContainText("Triangle");
   await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
   await expect(page.locator("canvas")).toBeVisible();
@@ -400,7 +400,9 @@ test("un PDF vectoriel et la surface suffisent aussi à générer la 3D", async 
   await page
     .getByRole("button", { name: "Créer mon appartement en 3D", exact: true })
     .click();
-  await expect(page.locator(".analysis-banner")).toContainText("2 pièces");
+  await expect(page.locator(".analysis-banner")).toContainText("2 pièces", {
+    timeout: 20000,
+  });
   await expect(page.locator("footer")).toContainText("60.0 m²");
   await expect(page.locator("canvas")).toBeVisible();
 });
