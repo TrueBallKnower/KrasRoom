@@ -61,11 +61,25 @@ export async function importProject(blob: Blob) {
       expanded += file.originalSize;
       if (expanded > 300 * 1024 * 1024)
         throw Error("Archive décompressée trop volumineuse (300 Mo maximum).");
-      return file.name === "project.json" || file.name.startsWith("assets/");
+      return (
+        !file.name.startsWith("__MACOSX/") &&
+        (file.name === "project.json" ||
+          file.name.endsWith("/project.json") ||
+          file.name.startsWith("assets/") ||
+          file.name.includes("/assets/"))
+      );
     },
   });
-  if (!files["project.json"]) throw Error("Archive Roomora attendue.");
-  const p = JSON.parse(strFromU8(files["project.json"]));
+  const candidates = Object.keys(files).filter(
+    (name) => name === "project.json" || name.endsWith("/project.json"),
+  );
+  if (candidates.length !== 1)
+    throw Error(
+      "La sauvegarde doit contenir un seul fichier project.json. Sélectionnez le ZIP Roomora.",
+    );
+  const projectPath = candidates[0];
+  const prefix = projectPath.slice(0, -"project.json".length);
+  const p = JSON.parse(strFromU8(files[projectPath]));
   validateProject(p);
   const ids = new Set(
     [p.plan?.asset, ...p.items.flatMap((i: Item) => [i.asset, i.photo])].filter(
@@ -73,14 +87,14 @@ export async function importProject(blob: Blob) {
     ) as string[],
   );
   for (const id of ids)
-    if (!files["assets/" + id])
+    if (!files[prefix + "assets/" + id])
       throw Error("Ressource absente de la sauvegarde.");
   const remap = new Map<string, string>();
   for (const id of ids)
     remap.set(
       id,
       await assetPut(
-        new Blob([files["assets/" + id] as Uint8Array<ArrayBuffer>]),
+        new Blob([files[prefix + "assets/" + id] as Uint8Array<ArrayBuffer>]),
       ),
     );
   if (p.plan) p.plan.asset = remap.get(p.plan.asset)!;

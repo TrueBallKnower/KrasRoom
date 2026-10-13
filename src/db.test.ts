@@ -1,4 +1,5 @@
 import "fake-indexeddb/auto";
+import { zipSync, unzipSync } from "fflate";
 import { describe, it, expect } from "vitest";
 import { demo } from "./model";
 import {
@@ -35,6 +36,30 @@ describe("Persistance et sauvegardes portables", () => {
       "ressource 3D exacte",
     );
     expect(restored.plan!.asset).toBe(restored.items[0].asset);
+  });
+  it("restaure un dossier recompressé par le Finder avec ses ressources", async () => {
+    const p = demo();
+    const id = await assetPut(new Blob(["modèle conservé"]));
+    p.items[0].asset = id;
+    const original = unzipSync(
+      new Uint8Array(await (await exportProject(p)).arrayBuffer()),
+    );
+    const nested = Object.fromEntries(
+      Object.entries(original).map(([name, bytes]) => [
+        "roomora-plan-simplifie/" + name,
+        bytes,
+      ]),
+    );
+    nested["__MACOSX/roomora-plan-simplifie/._project.json"] = new Uint8Array([
+      0,
+    ]);
+    const restored = await importProject(
+      new Blob([zipSync(nested) as Uint8Array<ArrayBuffer>]),
+    );
+    expect(restored.walls).toEqual(p.walls);
+    expect(await (await assetGet(restored.items[0].asset!))!.text()).toBe(
+      "modèle conservé",
+    );
   });
   it("refuse une archive invalide", async () => {
     await expect(importProject(new Blob(["incorrect"]))).rejects.toThrow();
