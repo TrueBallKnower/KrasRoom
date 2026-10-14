@@ -1584,3 +1584,19 @@ button:focus-visible {
 .plan-controls button:last-child {
   display: inline-flex;
 }
+[data-theme="dark"] {
+  --bg: #1d2633;
+  --soft: #263244;
+  --line: #354357;
+  --ink: #e6edf7;
+  --muted: #a0adc0;
+  --green: #73a5ff;
+  --tint: #2b3d59;
+  color: var(--ink);
+}
+[data-theme="dark"] .workspace main {
+  background: #17202c;
+}
+[data-theme="dark"] .plan-svg {
+  background-color: #17202c;
+}
