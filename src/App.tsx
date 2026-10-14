@@ -65,6 +65,7 @@ import {
 } from "./db";
 import { importPlan, importModel, importURL } from "./imports";
 import AssetImage from "./AssetImage";
+import FurniturePreview from "./FurniturePreview";
 import AutoPlanImport from "./AutoPlanImport";
 import Plan, { type Tool } from "./Plan";
 const Scene = lazy(() => import("./Scene"));
@@ -383,8 +384,14 @@ export default function App() {
       <div className="workspace">
         <aside className="left">
           <div className="sidebar-heading">
-            <span>Votre espace, vos idées.</span>
-            <h2>Aménagez librement</h2>
+            <span>ÉDITEUR D’INTÉRIEUR</span>
+            <h2>
+              {tab === "build"
+                ? "Construire le plan"
+                : tab === "personal"
+                  ? "Ma collection"
+                  : "Meubler & décorer"}
+            </h2>
           </div>
           <div className="tabs">
             <button
@@ -518,7 +525,7 @@ export default function App() {
                         onClick={() => add(furniture(c))}
                       >
                         <div className={"furniture-preview " + c[1]}>
-                          <span>{iconFor(c[1])}</span>
+                          <FurniturePreview kind={c[1]} />
                           <span className="add-circle">
                             <Plus size={14} />
                           </span>
@@ -540,7 +547,11 @@ export default function App() {
                             onClick={() => add(i)}
                           >
                             <div className="furniture-preview">
-                              <span>{iconFor(i.kind)}</span>
+                              {i.photo ? (
+                                <AssetImage id={i.photo} alt={i.name} />
+                              ) : (
+                                <FurniturePreview kind={i.kind} />
+                              )}
                               <span className="add-circle">
                                 <Plus size={14} />
                               </span>
@@ -677,6 +688,33 @@ export default function App() {
               </button>
             </div>
           </div>
+          <nav className="drawing-toolbar" aria-label="Outils du plan">
+            {(
+              [
+                ["select", "Sélectionner", MousePointer2],
+                ["wall", "Tracer des murs", Wallpaper],
+                ["room", "Définir une pièce", Grid2X2],
+                ["door", "Ajouter une porte", DoorOpen],
+                ["window", "Ajouter une fenêtre", Layers],
+                ["measure", "Mesurer une distance", Ruler],
+              ] as const
+            ).map(([key, label, Icon]) => (
+              <button
+                key={key}
+                title={label}
+                aria-label={label + " — outil rapide"}
+                aria-pressed={view === "2d" && tool === key}
+                className={view === "2d" && tool === key ? "active" : ""}
+                onClick={() => {
+                  setView("2d");
+                  setTool(key);
+                  if (key !== "select") setTab("build");
+                }}
+              >
+                <Icon size={19} />
+              </button>
+            ))}
+          </nav>
           {p.analysis && (
             <div className="analysis-banner">
               <span>

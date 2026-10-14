@@ -35,8 +35,12 @@ export default function Plan({
       point: Point;
     } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
-  useEffect(() => {
-    if (!p.analysis || !p.walls.length) return;
+  function fitPlan() {
+    if (!p.walls.length) {
+      setZoom(1);
+      setOrigin({ x: -1, y: -1 });
+      return;
+    }
     const points = p.walls.flatMap((w) => [w.a, w.b]),
       xs = points.map((q) => q.x),
       ys = points.map((q) => q.y);
@@ -50,6 +54,9 @@ export default function Plan({
         9 / (Math.max(...ys) - minY + 2),
       ),
     );
+  }
+  useEffect(() => {
+    fitPlan();
   }, [p.id]);
   useEffect(() => {
     setPoints([]);
@@ -210,14 +217,7 @@ export default function Plan({
         <button onClick={() => setZoom(Math.max(0.3, zoom / 1.2))}>−</button>
         <span>{Math.round(zoom * 100)} %</span>
         <button onClick={() => setZoom(Math.min(4, zoom * 1.2))}>+</button>
-        <button
-          onClick={() => {
-            setZoom(1);
-            setOrigin({ x: -1, y: -1 });
-          }}
-        >
-          Recentrer
-        </button>
+        <button onClick={fitPlan}>Tout voir</button>
       </div>
       <svg
         ref={svg}
@@ -430,6 +430,69 @@ export default function Plan({
                   }
                   strokeWidth={selected === i.id ? 0.04 : 0.02}
                 />
+                <g
+                  pointerEvents="none"
+                  stroke="#ffffffaa"
+                  strokeWidth=".025"
+                  fill="#ffffff44"
+                >
+                  {i.kind === "bed" && (
+                    <>
+                      <rect
+                        x={-i.width * 0.42}
+                        y={-i.depth * 0.42}
+                        width={i.width * 0.37}
+                        height={i.depth * 0.2}
+                        rx=".06"
+                      />
+                      <rect
+                        x={i.width * 0.05}
+                        y={-i.depth * 0.42}
+                        width={i.width * 0.37}
+                        height={i.depth * 0.2}
+                        rx=".06"
+                      />
+                      <path
+                        d={`M${-i.width / 2} ${-i.depth * 0.1}H${i.width / 2}`}
+                      />
+                    </>
+                  )}
+                  {i.kind === "sofa" && (
+                    <>
+                      <rect
+                        x={-i.width * 0.47}
+                        y={-i.depth * 0.35}
+                        width={i.width * 0.12}
+                        height={i.depth * 0.8}
+                        rx=".04"
+                      />
+                      <rect
+                        x={i.width * 0.35}
+                        y={-i.depth * 0.35}
+                        width={i.width * 0.12}
+                        height={i.depth * 0.8}
+                        rx=".04"
+                      />
+                      <path d={`M0 ${-i.depth * 0.2}V${i.depth * 0.42}`} />
+                    </>
+                  )}
+                  {i.kind === "plant" && (
+                    <circle
+                      r={Math.min(i.width, i.depth) * 0.4}
+                      fill="#75a678"
+                    />
+                  )}
+                  {(i.kind === "table" || i.kind === "rug") && (
+                    <rect
+                      x={-i.width * 0.43}
+                      y={-i.depth * 0.4}
+                      width={i.width * 0.86}
+                      height={i.depth * 0.8}
+                      rx=".04"
+                      fill="none"
+                    />
+                  )}
+                </g>
                 <line
                   x1={-i.width * 0.35}
                   x2={i.width * 0.35}

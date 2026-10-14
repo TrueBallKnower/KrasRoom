@@ -83,7 +83,9 @@ test("création de projet et murs à l’échelle", async ({ page }) => {
   await page
     .getByRole("button", { name: "Nouvel appartement", exact: true })
     .click();
-  await page.getByRole("button", { name: "Tracer des murs" }).click();
+  await page
+    .getByRole("button", { name: "Tracer des murs", exact: true })
+    .click();
   const svg = page.locator(".plan-svg"),
     box = await svg.boundingBox();
   if (!box) throw Error("Plan absent");
@@ -231,7 +233,7 @@ test("meuble glissé dans le plan, placement contre un mur et interface mobile",
     before,
   );
   await page.getByTitle("Annuler · ⌘Z").click();
-  await item.locator("rect").click();
+  await item.locator(":scope > rect").click();
   await expect(page.getByLabel("Position X", { exact: true })).toHaveValue(
     before,
   );
