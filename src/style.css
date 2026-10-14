@@ -1581,3 +1581,6 @@ button:focus-visible {
     display: none;
   }
 }
+.plan-controls button:last-child {
+  display: inline-flex;
+}
