@@ -630,3 +630,46 @@ test("importe un GLB Draco avec le décodeur fourni par Roomora", async ({
   );
   await expect(page.getByLabel("Largeur", { exact: true })).toHaveValue("1");
 });
+
+test("E masque et réaffiche les alertes sans modifier les meubles", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Canapé 2.2 × 0.9 m", exact: true })
+    .click();
+  await page.getByLabel("Largeur", { exact: true }).fill("10");
+  const warning = page
+    .locator(".warning")
+    .filter({ hasText: "Ce meuble chevauche" });
+  const toggle = page.getByRole("button", {
+    name: "Alertes de chevauchement",
+    exact: true,
+  });
+  await expect(warning).toBeVisible();
+  await expect(
+    page.locator('.plan-svg g[data-item] > rect[stroke="#d86a54"]').first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+  await page.keyboard.press("e");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(warning).toHaveCount(0);
+  await expect(
+    page.locator('.plan-svg g[data-item] > rect[stroke="#d86a54"]'),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Largeur", { exact: true })).toHaveValue("10");
+  await page.getByLabel("Nom", { exact: true }).focus();
+  await page.keyboard.press("e");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+  await page.keyboard.press("e");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(warning).toBeVisible();
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(warning).toHaveCount(0);
+  await toggle.click();
+  await expect(warning).toBeVisible();
+});

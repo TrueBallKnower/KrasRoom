@@ -74,6 +74,7 @@ Les données appartiennent à ce navigateur, cet appareil et cette origine web. 
 - Visite : cliquer dans la scène, ZQSD ou WASD et flèches pour avancer, Échap pour libérer la souris. Ce mode est prévu pour souris/clavier, sans collision physique.
 - **Rendu → Réaliste** active un éclairage ambiant calculé localement, des arêtes adoucies et des matières textiles. Aucun HDRI externe ni clé API.
 - Cliquez sur une pièce en 2D ou sur son sol en 3D pour choisir chêne, noyer, parquet clair, carrelage, béton ou couleur unie. Les textures sont procédurales, les dimensions restent inchangées et les choix sont inclus dans les sauvegardes.
+- **E** masque ou réaffiche les alertes de chevauchement (rouge en 2D/3D et avertissement du panneau). Le bouton triangle dans la barre de vue fait la même chose. Les erreurs d’importation et de sauvegarde restent visibles.
 - Mode clair/sombre, plein écran, meubles masqués et captures PNG sont disponibles.
 
 ## Tests

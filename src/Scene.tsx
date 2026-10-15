@@ -586,9 +586,11 @@ export default function Scene({
   walkSpeed = 1.4,
   realistic = false,
   paused = false,
+  showCollisions = true,
 }: {
   realistic?: boolean;
   paused?: boolean;
+  showCollisions?: boolean;
   eyeHeight?: number;
   fieldOfView?: number;
   walkSpeed?: number;
@@ -760,10 +762,11 @@ export default function Scene({
                   )}
                 </Suspense>
                 {(selected === i.id ||
-                  collides(
-                    drag?.id === i.id ? { ...i, x: drag.x, y: drag.y } : i,
-                    p,
-                  )) && (
+                  (showCollisions &&
+                    collides(
+                      drag?.id === i.id ? { ...i, x: drag.x, y: drag.y } : i,
+                      p,
+                    ))) && (
                   <mesh
                     rotation={[-Math.PI / 2, 0, 0]}
                     position={[0, 0.015, 0]}
@@ -771,6 +774,7 @@ export default function Scene({
                     <planeGeometry args={[i.width + 0.08, i.depth + 0.08]} />
                     <meshBasicMaterial
                       color={
+                        showCollisions &&
                         collides(
                           drag?.id === i.id
                             ? { ...i, x: drag.x, y: drag.y }

@@ -17,11 +17,13 @@ export default function Plan({
   tool,
   snap,
   hide,
+  showCollisions = true,
   onMessage,
 }: {
   tool: Tool;
   snap: boolean;
   hide: boolean;
+  showCollisions?: boolean;
   onMessage: (s: string) => void;
 }) {
   const { project: p, selected, select, change } = useStore();
@@ -433,7 +435,7 @@ export default function Plan({
                   rx=".05"
                   fill={i.color}
                   stroke={
-                    collides({ ...i, x: pos.x, y: pos.y }, p)
+                    showCollisions && collides({ ...i, x: pos.x, y: pos.y }, p)
                       ? "#d86a54"
                       : selected === i.id
                         ? "#347461"

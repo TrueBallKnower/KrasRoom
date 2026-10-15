@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   Armchair,
+  AlertTriangle,
   ArrowDownToLine,
   ArrowUpFromLine,
   Box,
@@ -127,6 +128,7 @@ export default function App() {
     [snap, setSnap] = useState(true),
     [dark, setDark] = useState(localStorage.getItem("roomora-dark") === "true"),
     [hide, setHide] = useState(false),
+    [showCollisions, setShowCollisions] = useState(true),
     [transparent, setTransparent] = useState(true),
     [ceiling, setCeiling] = useState(false),
     [quality, setQuality] = useState(false),
@@ -229,6 +231,24 @@ export default function App() {
   }
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
+      if (
+        (e.target as HTMLElement).closest?.(
+          "input,textarea,select,[contenteditable=true]",
+        )
+      )
+        return;
+      if (
+        e.key.toLowerCase() === "e" &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        if (!e.repeat) {
+          e.preventDefault();
+          setShowCollisions((v) => !v);
+        }
+        return;
+      }
       if (
         document.pointerLockElement ||
         (e.target as HTMLElement).matches("input,textarea,select")
@@ -705,6 +725,18 @@ export default function App() {
             </div>
             <div className="viewport-actions">
               <button
+                aria-label="Alertes de chevauchement"
+                aria-pressed={showCollisions}
+                className={showCollisions ? "active" : ""}
+                title={
+                  (showCollisions ? "Masquer" : "Afficher") +
+                  " les alertes de chevauchement · E"
+                }
+                onClick={() => setShowCollisions((v) => !v)}
+              >
+                <AlertTriangle size={17} />
+              </button>
+              <button
                 title="Alignement sur une grille de 5 cm"
                 className={snap ? "active" : ""}
                 onClick={() => setSnap(!snap)}
@@ -793,7 +825,13 @@ export default function App() {
           )}
           <div className="viewport">
             {view === "2d" ? (
-              <Plan tool={tool} snap={snap} hide={hide} onMessage={notify} />
+              <Plan
+                tool={tool}
+                snap={snap}
+                hide={hide}
+                showCollisions={showCollisions}
+                onMessage={notify}
+              />
             ) : (
               <>
                 <Suspense
@@ -811,6 +849,7 @@ export default function App() {
                     transparent={transparent}
                     ceiling={ceiling}
                     hide={hide}
+                    showCollisions={showCollisions}
                     quality={quality}
                     realistic={realistic}
                     paused={!!modal || busy}
@@ -1060,7 +1099,7 @@ export default function App() {
                   />
                 </label>
               </div>
-              {collides(item, p) && (
+              {showCollisions && collides(item, p) && (
                 <p className="warning">
                   Ce meuble chevauche un mur ou un autre meuble. Les ouvertures
                   ne sont pas prises en compte dans ce contrôle.
@@ -1737,8 +1776,9 @@ export default function App() {
                 </p>
                 <p>
                   ⌘/Ctrl Z : annuler · ⇧⌘/Ctrl Z : rétablir · ⌘/Ctrl D :
-                  dupliquer · R : rotation de 15° · Suppr : supprimer · Échap :
-                  quitter l’outil.
+                  dupliquer · R : rotation de 15° · E : masquer/afficher les
+                  alertes de chevauchement · Suppr : supprimer · Échap : quitter
+                  l’outil.
                 </p>
                 <p>
                   En visite : cliquez dans la scène, puis utilisez ZQSD ou WASD.
