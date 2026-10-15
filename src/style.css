@@ -1643,7 +1643,7 @@ button:focus-visible {
     gap: 8px;
   }
 }
-.object-actions {
+.scene-object-actions {
   position: absolute;
   z-index: 3;
   bottom: 105px;
@@ -1663,17 +1663,17 @@ button:focus-visible {
   width: max-content;
   font-size: 11px;
 }
-.object-actions strong {
+.scene-object-actions strong {
   padding: 0 9px;
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.object-actions button {
+.scene-object-actions button {
   padding: 8px;
 }
-.object-actions small {
+.scene-object-actions small {
   flex-basis: 100%;
   text-align: center;
   font-size: 10px;

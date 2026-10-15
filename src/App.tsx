@@ -120,7 +120,7 @@ export default function App() {
     [snap, setSnap] = useState(true),
     [dark, setDark] = useState(localStorage.getItem("roomora-dark") === "true"),
     [hide, setHide] = useState(false),
-    [transparent, setTransparent] = useState(false),
+    [transparent, setTransparent] = useState(true),
     [ceiling, setCeiling] = useState(false),
     [quality, setQuality] = useState(false),
     [eyeHeight, setEyeHeight] = useState(1.55),
@@ -788,7 +788,7 @@ export default function App() {
                 </Suspense>
                 {view === "3d" && item && (
                   <div
-                    className="object-actions"
+                    className="scene-object-actions"
                     aria-label="Actions du meuble en 3D"
                   >
                     <strong>{item.name}</strong>
