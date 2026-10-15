@@ -20,6 +20,7 @@ import {
   Grid,
   ContactShadows,
   RoundedBox,
+  Line,
 } from "@react-three/drei";
 import {
   Box3,
@@ -34,16 +35,25 @@ import {
   Vector2,
   type Group,
   type Texture,
+  MOUSE,
 } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { surfaceTexture } from "./materials";
+import { magneticPlacement, type AlignmentGuide } from "./placement";
 import { wallOutline, visitStart } from "./spatial";
-import { assetGet } from "./db";
-import { parseModel } from "./imports";
+import NavigationCamera from "./NavigationCamera";
+import { useNavigation } from "./navigation";
+import {
+  acquireModel,
+  normalizedClone,
+  modelFootprints,
+  modelNode,
+} from "./modelAssets";
 import { useStore } from "./store";
 import {
   distance,
   collides,
+  corners,
   uid,
   type Item,
   type Wall,
@@ -267,38 +277,40 @@ function Model({ i, onError }: { i: Item; onError: (s: string) => void }) {
   const [group, setGroup] = useState<Group>();
   useEffect(() => {
     let active = true;
-    assetGet(i.asset!)
-      .then((b) => {
-        if (!b) throw Error("Modèle local introuvable.");
-        return parseModel(b);
-      })
+    const lease = acquireModel(i.asset!);
+    lease.promise
       .then((g) => {
-        if (active) setGroup(g.scene);
+        if (active) {
+          setGroup(g.scene);
+          if (i.footprints === undefined) {
+            const footprints = modelFootprints(modelNode(g.scene, i.modelPart));
+            if (footprints)
+              useStore
+                .getState()
+                .enrichFootprints(i.asset!, i.modelPart, footprints);
+          }
+        }
       })
       .catch((e) => onError(e.message));
     return () => {
       active = false;
+      lease.release();
     };
-  }, [i.asset, onError]);
-  const normalized = useMemo(() => {
-    if (!group) return null;
-    const clone = group.clone(true),
-      box = new Box3().setFromObject(clone),
-      size = box.getSize(new Vector3()),
-      center = box.getCenter(new Vector3());
-    clone.position.set(-center.x, -box.min.y, -center.z);
-    return {
-      clone,
-      scale: [
-        i.width / (size.x || 1),
-        i.height / (size.y || 1),
-        i.depth / (size.z || 1),
-      ] as [number, number, number],
-    };
-  }, [group, i.width, i.height, i.depth]);
+  }, [i.asset, i.modelPart, i.footprints === undefined, onError]);
+  const normalized = useMemo(
+    () => (group ? normalizedClone(group, i.modelPart) : null),
+    [group, i.modelPart],
+  );
   return normalized ? (
-    <group scale={normalized.scale}>
-      <primitive object={normalized.clone} />
+    <group
+      scale={[
+        i.width / (normalized.size.x || 1),
+        i.height / (normalized.size.y || 1),
+        i.depth / (normalized.size.z || 1),
+      ]}
+      dispose={null}
+    >
+      <primitive object={normalized.group} dispose={null} />
     </group>
   ) : (
     <Box
@@ -507,30 +519,6 @@ function Walk({
   });
   return <PointerLockControls pointerSpeed={0.65} />;
 }
-function FitCamera({
-  id,
-  x,
-  y,
-  span,
-  walk,
-}: {
-  id: string;
-  x: number;
-  y: number;
-  span: number;
-  walk: boolean;
-}) {
-  const { camera } = useThree();
-  useLayoutEffect(() => {
-    if (!walk) {
-      camera.position.set(x + span * 0.9, span * 0.95, y + span * 1.1);
-      camera.lookAt(x, 0, y);
-      camera.updateProjectionMatrix();
-      camera.updateMatrixWorld();
-    }
-  }, [camera, id, walk, x, y, span]);
-  return null;
-}
 function DropFurniture() {
   const { gl, camera } = useThree();
   const { change, select } = useStore();
@@ -609,8 +597,12 @@ export default function Scene({
   );
   useEffect(() => () => fabricTexture?.dispose(), [fabricTexture]);
   const bounds = useMemo(() => {
-    const points = p.walls.flatMap((w) => [w.a, w.b]);
-    if (!points.length) return { x: 4, y: 3, span: 8 };
+    const points = [
+      ...p.walls.flatMap((w) => [w.a, w.b]),
+      ...p.rooms.flatMap((r) => r.points),
+      ...p.items.flatMap((i) => corners(i)),
+    ];
+    if (!points.length) return { x: 4, y: 3, span: 8, height: 2.6 };
     const xs = points.map((q) => q.x),
       ys = points.map((q) => q.y),
       minX = Math.min(...xs),
@@ -621,69 +613,131 @@ export default function Scene({
       x: (minX + maxX) / 2,
       y: (minY + maxY) / 2,
       span: Math.max(4, maxX - minX, maxY - minY),
+      height: Math.max(
+        2.6,
+        ...p.walls.map((w) => w.height),
+        ...p.items.map((i) => i.height + (i.elevation || 0)),
+      ),
     };
-  }, [p.id]);
-  const [drag, setDrag] = useState<{
+  }, [p.walls, p.rooms, p.items]);
+  const collisionIds = useMemo(
+    () =>
+      new Set(
+        showCollisions
+          ? p.items.filter((i) => collides(i, p)).map((i) => i.id)
+          : [],
+      ),
+    [p, showCollisions],
+  );
+  const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(
+    null,
+  );
+  const draggedItem = drag ? p.items.find((i) => i.id === drag.id) : undefined;
+  const previewCollision =
+    showCollisions && drag && draggedItem
+      ? collides({ ...draggedItem, x: drag.x, y: drag.y }, p)
+      : false;
+  const [hovered, setHovered] = useState(false);
+  const [guides, setGuides] = useState<AlignmentGuide[]>([]);
+  const gesture = useRef<{
     id: string;
     x: number;
     y: number;
     dx: number;
     dy: number;
+    sx: number;
+    sy: number;
   } | null>(null);
+  const { mode, space } = useNavigation();
+  const panning = mode === "pan" || space;
   const orbit = useRef<React.ComponentRef<typeof OrbitControls>>(null);
-  useEffect(() => {
-    if (!drag) return;
-    const cancel = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setDrag(null);
-        if (orbit.current) orbit.current.enabled = true;
-      }
-    };
-    window.addEventListener("keydown", cancel);
-    return () => window.removeEventListener("keydown", cancel);
-  }, [drag]);
-  const ground = useMemo(() => new Plane(new Vector3(0, 1, 0), 0), []);
-  function move(e: ThreeEvent<PointerEvent>) {
-    if (!drag) return;
-    e.stopPropagation();
-    const q = e.ray.intersectPlane(ground, new Vector3());
-    if (!q) return;
-    const round = (v: number) => (snap ? Math.round(v * 20) / 20 : v);
-    setDrag({ ...drag, x: round(q.x - drag.dx), y: round(q.z - drag.dy) });
-  }
-  function finish(e: ThreeEvent<PointerEvent>) {
-    if (!drag) return;
-    e.stopPropagation();
-    change((p) => {
-      const i = p.items.find((i) => i.id === drag.id);
-      if (i) {
-        i.x = drag.x;
-        i.y = drag.y;
-      }
-    });
+  function cancelDrag() {
+    setGuides([]);
+    gesture.current = null;
     setDrag(null);
     if (orbit.current) orbit.current.enabled = true;
+  }
+  useEffect(() => {
+    const cancel = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cancelDrag();
+    };
+    const blur = () => cancelDrag();
+    window.addEventListener("keydown", cancel);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", cancel);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
+  useEffect(() => {
+    if (panning) cancelDrag();
+  }, [panning]);
+  const ground = useMemo(() => new Plane(new Vector3(0, 1, 0), 0), []);
+  function move(e: ThreeEvent<PointerEvent>) {
+    const g = gesture.current;
+    if (!g) return;
+    e.stopPropagation();
+    if (!drag && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 5) return;
+    const q = e.ray.intersectPlane(ground, new Vector3());
+    if (!q) return;
+    const candidate = {
+      ...p.items.find((i) => i.id === g.id)!,
+      x: q.x - g.dx,
+      y: q.z - g.dy,
+    };
+    const placement = snap
+      ? magneticPlacement(candidate, p)
+      : { item: candidate, guides: [] };
+    setDrag({ id: g.id, x: placement.item.x, y: placement.item.y });
+    setGuides(placement.guides);
+  }
+  function finish(e: ThreeEvent<PointerEvent>) {
+    const g = gesture.current;
+    if (!g) return;
+    e.stopPropagation();
+    if (
+      drag &&
+      (Math.abs(drag.x - g.x) > 0.0001 || Math.abs(drag.y - g.y) > 0.0001)
+    )
+      change((p) => {
+        const i = p.items.find((i) => i.id === g.id);
+        if (i) {
+          i.x = drag.x;
+          i.y = drag.y;
+        }
+      });
+    cancelDrag();
+    setGuides([]);
     (e.target as Element).releasePointerCapture(e.pointerId);
   }
   return (
     <Canvas
       shadows
-      frameloop={paused ? "never" : "always"}
-      style={{ touchAction: "none", cursor: drag ? "grabbing" : "grab" }}
+      frameloop={paused ? "never" : walk ? "always" : "demand"}
+      style={{
+        touchAction: "none",
+        cursor: drag
+          ? "grabbing"
+          : panning
+            ? "grab"
+            : hovered
+              ? "move"
+              : "grab",
+      }}
       dpr={[1, quality ? 2 : 1.25]}
       gl={{ preserveDrawingBuffer: true }}
       camera={{
         position: [11, 10, 13],
         fov: walk ? fieldOfView : 42,
         near: 0.05,
-        far: 500,
+        far: Math.max(500, bounds.span * 30),
       }}
       onPointerMissed={() => select(null)}
     >
       <RealismContext.Provider value={realistic}>
         <FabricContext.Provider value={fabricTexture}>
           <StudioLighting realistic={realistic} />
-          <FitCamera id={p.id} {...bounds} walk={walk} />
+          {!walk && <NavigationCamera key={p.id} id={p.id} bounds={bounds} />}
           <DropFurniture />
           <color attach="background" args={["#e8eae6"]} />
           <ambientLight intensity={realistic ? 0.45 : 1.1} />
@@ -722,75 +776,108 @@ export default function Scene({
             />
           ))}
           {!hide &&
-            p.items.map((i) => (
-              <group
-                key={i.id}
-                position={[
-                  drag?.id === i.id ? drag.x : i.x,
-                  0,
-                  drag?.id === i.id ? drag.y : i.y,
-                ]}
-                rotation={[0, (-i.rotation * Math.PI) / 180, 0]}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  select(i.id);
-                }}
-                onPointerMove={move}
-                onPointerUp={finish}
-                onPointerDown={(e) => {
-                  if (walk) return;
-                  e.stopPropagation();
-                  select(i.id);
-                  if (orbit.current) orbit.current.enabled = false;
-                  const q = e.ray.intersectPlane(ground, new Vector3());
-                  if (q)
-                    setDrag({
+            p.items.map((i) => {
+              const collision =
+                drag?.id === i.id ? previewCollision : collisionIds.has(i.id);
+              return (
+                <group
+                  key={i.id}
+                  position={[
+                    drag?.id === i.id ? drag.x : i.x,
+                    i.elevation || 0,
+                    drag?.id === i.id ? drag.y : i.y,
+                  ]}
+                  rotation={[0, (-i.rotation * Math.PI) / 180, 0]}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    select(i.id);
+                  }}
+                  onPointerMove={move}
+                  onPointerUp={finish}
+                  onPointerEnter={() => setHovered(true)}
+                  onPointerLeave={() => setHovered(false)}
+                  onPointerCancel={() => {
+                    cancelDrag();
+                    setGuides([]);
+                  }}
+                  onPointerDown={(e) => {
+                    if (
+                      walk ||
+                      panning ||
+                      e.button !== 0 ||
+                      e.ctrlKey ||
+                      e.metaKey ||
+                      e.shiftKey
+                    )
+                      return;
+                    e.stopPropagation();
+                    select(i.id);
+                    const q = e.ray.intersectPlane(ground, new Vector3());
+                    if (!q) return;
+                    if (orbit.current) orbit.current.enabled = false;
+                    gesture.current = {
                       id: i.id,
                       x: i.x,
                       y: i.y,
                       dx: q.x - i.x,
                       dy: q.z - i.y,
-                    });
-                  (e.target as Element).setPointerCapture(e.pointerId);
-                }}
-              >
-                <Suspense fallback={null}>
-                  {i.asset ? (
-                    <Model i={i} onError={onError} />
-                  ) : (
-                    <BuiltIn i={i} />
-                  )}
-                </Suspense>
-                {(selected === i.id ||
-                  (showCollisions &&
-                    collides(
-                      drag?.id === i.id ? { ...i, x: drag.x, y: drag.y } : i,
-                      p,
-                    ))) && (
-                  <mesh
-                    rotation={[-Math.PI / 2, 0, 0]}
-                    position={[0, 0.015, 0]}
-                  >
-                    <planeGeometry args={[i.width + 0.08, i.depth + 0.08]} />
-                    <meshBasicMaterial
-                      color={
-                        showCollisions &&
-                        collides(
-                          drag?.id === i.id
-                            ? { ...i, x: drag.x, y: drag.y }
-                            : i,
-                          p,
-                        )
-                          ? "#dc725e"
-                          : "#41796b"
-                      }
-                      transparent
-                      opacity={0.5}
-                    />
-                  </mesh>
-                )}
-              </group>
-            ))}
+                      sx: e.clientX,
+                      sy: e.clientY,
+                    };
+                    (e.target as Element).setPointerCapture(e.pointerId);
+                  }}
+                >
+                  <Suspense fallback={null}>
+                    {i.asset ? (
+                      <Model i={i} onError={onError} />
+                    ) : (
+                      <BuiltIn i={i} />
+                    )}
+                  </Suspense>
+                  {(selected === i.id || collision) &&
+                    (collision && i.footprints
+                      ? i.footprints
+                      : [{ x: 0, y: 0, width: 1, depth: 1, bottom: 0, top: 1 }]
+                    ).map((f, k) => (
+                      <mesh
+                        key={k}
+                        rotation={[-Math.PI / 2, 0, 0]}
+                        position={[
+                          f.x * i.width,
+                          0.015 - (i.elevation || 0),
+                          f.y * i.depth,
+                        ]}
+                      >
+                        <planeGeometry
+                          args={[
+                            f.width * i.width + 0.01,
+                            f.depth * i.depth + 0.01,
+                          ]}
+                        />
+                        <meshBasicMaterial
+                          color={collision ? "#dc725e" : "#41796b"}
+                          transparent
+                          opacity={0.45}
+                        />
+                      </mesh>
+                    ))}
+                </group>
+              );
+            })}
+          {guides.map((g, index) => (
+            <Line
+              key={index}
+              points={[
+                [g.a.x, 0.025, g.a.y],
+                [g.b.x, 0.025, g.b.y],
+              ]}
+              color="#397bea"
+              lineWidth={1.5}
+              dashed
+              dashSize={0.12}
+              gapSize={0.07}
+            />
+          ))}
           {(quality || realistic) && (
             <ContactShadows
               position={[4, 0.005, 3]}
@@ -810,11 +897,20 @@ export default function Scene({
             <OrbitControls
               ref={orbit}
               makeDefault
+              zoomToCursor
+              screenSpacePanning={false}
+              minDistance={Math.max(0.25, Math.min(1, bounds.span * 0.04))}
+              maxDistance={Math.max(30, bounds.span * 12)}
+              mouseButtons={{
+                LEFT: panning ? MOUSE.PAN : MOUSE.ROTATE,
+                MIDDLE: MOUSE.DOLLY,
+                RIGHT: MOUSE.PAN,
+              }}
               enableDamping
               dampingFactor={0.1}
               enabled={!drag}
               target={[bounds.x, 0, bounds.y]}
-              maxPolarAngle={Math.PI / 2 - 0.03}
+              maxPolarAngle={Math.PI / 2}
             />
           )}
         </FabricContext.Provider>

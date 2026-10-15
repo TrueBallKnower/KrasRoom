@@ -72,6 +72,11 @@ import {
 } from "./imports";
 import { floorFinishes } from "./floorFinishes";
 import FurnitureSources from "./FurnitureSources";
+import StorageStatus from "./StorageStatus";
+import DimensionsEditor from "./DimensionsEditor";
+import { edgeWallDistance } from "./placement";
+const SplitModel = lazy(() => import("./SplitModel"));
+import CameraToolbar from "./CameraToolbar";
 import AssetImage from "./AssetImage";
 import { visitStart } from "./spatial";
 import FurniturePreview from "./FurniturePreview";
@@ -141,11 +146,12 @@ export default function App() {
     [saveError, setSaveError] = useState(false),
     [loaded, setLoaded] = useState(false),
     [modal, setModal] = useState<
-      null | "projects" | "import" | "reference" | "help" | "autoPlan"
+      null | "projects" | "import" | "reference" | "help" | "autoPlan" | "split"
     >(null),
     [allProjects, setAllProjects] = useState<Project[]>([]),
     [personal, setPersonal] = useState<Item[]>([]),
     [busy, setBusy] = useState(false),
+    [busyStage, setBusyStage] = useState("Traitement en cours…"),
     [url, setUrl] = useState("");
   const saved = !loaded
     ? "Chargement…"
@@ -287,6 +293,7 @@ export default function App() {
   });
   async function run(f: () => Promise<void>) {
     setBusy(true);
+    setBusyStage("Traitement en cours…");
     try {
       await f();
     } catch (e) {
@@ -298,8 +305,8 @@ export default function App() {
   function loadFurniture(file: File | File[]) {
     return run(async () => {
       const i = await (Array.isArray(file)
-        ? importFurnitureFiles(file)
-        : importFurnitureFile(file));
+        ? importFurnitureFiles(file, setBusyStage)
+        : importFurnitureFile(file, setBusyStage));
       await libraryPut(i);
       setPersonal(await library());
       setModal(null);
@@ -856,6 +863,7 @@ export default function App() {
                     onError={notify}
                   />
                 </Suspense>
+                {view === "3d" && <CameraToolbar />}
                 {view === "3d" && item && (
                   <div
                     className="scene-object-actions"
@@ -911,7 +919,7 @@ export default function App() {
                 <div className="canvas-hint">
                   {view === "walk"
                     ? "Cliquez pour visiter · ZQSD / WASD pour avancer · Échap pour libérer la souris"
-                    : "Glissez un meuble du catalogue dans la pièce · Glissez le fond pour tourner · Molette pour zoomer"}
+                    : "Gauche : tourner / déplacer un meuble · Clic droit ou Espace + glisser : déplacer la vue · Molette : zoom au curseur"}
                 </div>
                 {view === "walk" && (
                   <div className="visit-settings">
@@ -1055,34 +1063,33 @@ export default function App() {
                   onChange={(e) => editItem("name", e.target.value)}
                 />
               </label>
-              <div className="property-section">
-                <h4>Dimensions</h4>
-                {num(
-                  "Largeur",
-                  item.width,
-                  (v) => editItem("width", v),
-                  0.01,
-                  100,
-                )}
-                {num(
-                  "Profondeur",
-                  item.depth,
-                  (v) => editItem("depth", v),
-                  0.01,
-                  100,
-                )}
-                {num(
-                  "Hauteur",
-                  item.height,
-                  (v) => editItem("height", v),
-                  0.01,
-                  100,
-                )}
-              </div>
+              <DimensionsEditor
+                key={item.id}
+                item={item}
+                onPatch={(patch) =>
+                  change((p) => {
+                    Object.assign(
+                      p.items.find((i) => i.id === item.id)!,
+                      patch,
+                    );
+                  })
+                }
+              />
+              {item.asset && (
+                <button
+                  className="outline full"
+                  onClick={() => setModal("split")}
+                >
+                  Dissocier cet ensemble 3D
+                </button>
+              )}
               <div className="property-section">
                 <h4>Position et orientation</h4>
                 {num("Position X", item.x, (v) => editItem("x", v), -1000)}
                 {num("Position Y", item.y, (v) => editItem("y", v), -1000)}
+                {num("Élévation au-dessus du sol", item.elevation || 0, (v) =>
+                  editItem("elevation", v),
+                )}
                 {num(
                   "Rotation",
                   item.rotation,
@@ -1101,17 +1108,16 @@ export default function App() {
               </div>
               {showCollisions && collides(item, p) && (
                 <p className="warning">
-                  Ce meuble chevauche un mur ou un autre meuble. Les ouvertures
-                  ne sont pas prises en compte dans ce contrôle.
+                  Chevauchement possible avec un mur ou un autre meuble. Le
+                  contrôle utilise des empreintes simplifiées ; les ouvertures
+                  ne sont pas prises en compte.
                 </p>
               )}
               <p className="small">
-                Distance du centre au mur le plus proche :{" "}
+                Distance libre estimée entre le bord et le mur :{" "}
                 {p.walls.length
                   ? Math.min(
-                      ...p.walls.map((w) =>
-                        segmentDistance({ x: item.x, y: item.y }, w.a, w.b),
-                      ),
+                      ...p.walls.map((w) => edgeWallDistance(item, w)),
                     ).toFixed(2) + " m"
                   : "aucun mur"}
               </p>
@@ -1525,7 +1531,7 @@ export default function App() {
       )}
       {busy && (
         <div className="busy" role="status">
-          Traitement en cours…
+          {busyStage}
         </div>
       )}
       {modal && (
@@ -1577,6 +1583,7 @@ export default function App() {
               <>
                 <span className="eyebrow">VOTRE ATELIER</span>
                 <h2>Mes appartements</h2>
+                <StorageStatus project={p} />
                 <p className="small">
                   Sauvegardés dans ce navigateur. Exportez régulièrement une
                   copie.
@@ -1654,6 +1661,23 @@ export default function App() {
                   Créer un appartement de démonstration
                 </button>
               </>
+            ) : modal === "split" && item ? (
+              <Suspense fallback={<p>Chargement de la structure…</p>}>
+                <SplitModel
+                  item={item}
+                  onSplit={(items) => {
+                    change((p) => {
+                      p.items = p.items.filter((i) => i.id !== item.id);
+                      p.items.push(...items);
+                    });
+                    select(items[0]?.id || null);
+                    setModal(null);
+                    notify(
+                      "Ensemble dissocié. Annuler permet de retrouver le groupe initial.",
+                    );
+                  }}
+                />
+              </Suspense>
             ) : modal === "import" ? (
               <>
                 <span className="eyebrow">VOS MEUBLES, SANS LIMITE</span>
@@ -1700,7 +1724,7 @@ export default function App() {
                   onSubmit={(e) => {
                     e.preventDefault();
                     run(async () => {
-                      const i = await importURL(url);
+                      const i = await importURL(url, setBusyStage);
                       add(i);
                       await libraryPut(i);
                       setPersonal(await library());

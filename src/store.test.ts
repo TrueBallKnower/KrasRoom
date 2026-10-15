@@ -32,3 +32,18 @@ it("conserve la sélection pendant une édition annulée et la retire si le meub
   useStore.getState().undo();
   expect(useStore.getState().selected).toBeNull();
 });
+it("enrichit les anciens imports sans ajouter de commande dans l’historique", () => {
+  const i = { ...furniture(catalog[0]), asset: "shared-legacy" };
+  const p = blank();
+  p.items = [i, { ...i, id: "duplicate" }];
+  useStore.getState().set(p);
+  useStore
+    .getState()
+    .enrichFootprints("shared-legacy", undefined, [
+      { x: 0, y: 0, width: 1, depth: 1, bottom: 0, top: 1 },
+    ]);
+  expect(
+    useStore.getState().project.items.every((i) => i.footprints?.length === 1),
+  ).toBe(true);
+  expect(useStore.getState().past).toHaveLength(0);
+});

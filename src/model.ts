@@ -29,6 +29,16 @@ export type Item = {
   depth: number;
   height: number;
   color: string;
+  elevation?: number;
+  modelPart?: string;
+  footprints?: {
+    x: number;
+    y: number;
+    width: number;
+    depth: number;
+    bottom: number;
+    top: number;
+  }[];
   asset?: string;
   photo?: string;
   price?: string;
@@ -113,23 +123,70 @@ export function overlaps(a: Point[], b: Point[]) {
     }
   return true;
 }
-export function collides(i: Item, p: Project) {
-  return (
-    p.items.some((j) => j.id !== i.id && overlaps(corners(i), corners(j))) ||
-    p.walls.some((w) => {
-      const d = distance(w.a, w.b),
-        dx = (w.b.x - w.a.x) / d,
-        dy = (w.b.y - w.a.y) / d,
-        t = w.thickness / 2;
-      return overlaps(corners(i), [
-        { x: w.a.x - dy * t, y: w.a.y + dx * t },
-        { x: w.b.x - dy * t, y: w.b.y + dx * t },
-        { x: w.b.x + dy * t, y: w.b.y - dx * t },
-        { x: w.a.x + dy * t, y: w.a.y - dx * t },
-      ]);
-    })
-  );
+export function occupiedItems(
+  item: Item,
+): { item: Item; bottom: number; top: number }[] {
+  if (item.kind === "rug") return [];
+  if (!item.footprints)
+    return [
+      {
+        item,
+        bottom: item.elevation || 0,
+        top: (item.elevation || 0) + item.height,
+      },
+    ];
+  const angle = (item.rotation * Math.PI) / 180,
+    c = Math.cos(angle),
+    s = Math.sin(angle);
+  return item.footprints.map((f) => ({
+    item: {
+      ...item,
+      x: item.x + f.x * item.width * c - f.y * item.depth * s,
+      y: item.y + f.x * item.width * s + f.y * item.depth * c,
+      width: f.width * item.width,
+      depth: f.depth * item.depth,
+    },
+    bottom: (item.elevation || 0) + f.bottom * item.height,
+    top: (item.elevation || 0) + f.top * item.height,
+  }));
 }
+export function collides(i: Item, p: Project) {
+  const parts = occupiedItems(i);
+  if (!parts.length) return false;
+  if (
+    p.items.some(
+      (j) =>
+        j.id !== i.id &&
+        overlaps(corners(i), corners(j)) &&
+        parts.some((a) =>
+          occupiedItems(j).some(
+            (b) =>
+              a.bottom < b.top - 0.005 &&
+              b.bottom < a.top - 0.005 &&
+              overlaps(corners(a.item), corners(b.item)),
+          ),
+        ),
+    )
+  )
+    return true;
+  return p.walls.some((w) => {
+    const d = distance(w.a, w.b);
+    if (d < 0.001) return false;
+    const dx = (w.b.x - w.a.x) / d,
+      dy = (w.b.y - w.a.y) / d,
+      t = w.thickness / 2;
+    const poly = [
+      { x: w.a.x - dy * t, y: w.a.y + dx * t },
+      { x: w.b.x - dy * t, y: w.b.y + dx * t },
+      { x: w.b.x + dy * t, y: w.b.y - dx * t },
+      { x: w.a.x + dy * t, y: w.a.y - dx * t },
+    ];
+    return parts.some(
+      (a) => a.bottom < w.height && overlaps(corners(a.item), poly),
+    );
+  });
+}
+
 export const catalog = [
   ["Canapé", "sofa", 2.2, 0.9, 0.85, "Salon"],
   ["Fauteuil", "chair", 0.85, 0.85, 0.9, "Salon"],
@@ -289,6 +346,34 @@ export function validateProject(v: unknown): asserts v is Project {
       (i.photo !== undefined && !text(i.photo))
     )
       throw Error("Ressource de meuble invalide.");
+    if (i.elevation !== undefined && (!finite(i.elevation) || i.elevation < 0))
+      throw Error("Élévation invalide.");
+    if (
+      i.modelPart !== undefined &&
+      (!i.asset ||
+        !/^\d+(\/\d+)*$/.test(i.modelPart) ||
+        i.modelPart.length > 500)
+    )
+      throw Error("Sous-objet de modèle invalide.");
+    if (
+      i.footprints !== undefined &&
+      (!Array.isArray(i.footprints) ||
+        i.footprints.length > 64 ||
+        i.footprints.some(
+          (f) =>
+            ![f.x, f.y, f.width, f.depth, f.bottom, f.top].every(finite) ||
+            Math.abs(f.x) > 1 ||
+            Math.abs(f.y) > 1 ||
+            f.width <= 0 ||
+            f.width > 2 ||
+            f.depth <= 0 ||
+            f.depth > 2 ||
+            f.bottom < 0 ||
+            f.top > 1 ||
+            f.bottom > f.top,
+        ))
+    )
+      throw Error("Empreinte de modèle invalide.");
     if (i.url && !/^https?:\/\//i.test(i.url))
       throw Error("Lien produit invalide.");
   }

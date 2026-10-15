@@ -71,23 +71,71 @@ export async function parseModel(blob: Blob) {
     ),
   );
 }
-export async function importFurnitureFiles(files: File[]): Promise<Item> {
-  const prepared = await prepareFurnitureFolder(files);
-  return importModel(prepared.blob, prepared.name);
+export type ImportReport = (stage: string) => void;
+async function prepareInWorker(input: File | File[]) {
+  return new Promise<{ blob: Blob; name: string }>((resolve, reject) => {
+    const worker = new Worker(new URL("./bundle.worker.ts", import.meta.url), {
+      type: "module",
+    });
+    worker.onmessage = (e) => {
+      worker.terminate();
+      if (e.data.error) reject(Error(e.data.error));
+      else resolve(e.data.result);
+    };
+    worker.onerror = () => {
+      worker.terminate();
+      reject(
+        Error(
+          "Préparation du dossier impossible. Réessayez avec un fichier GLB.",
+        ),
+      );
+    };
+    worker.postMessage(input);
+  });
 }
-export async function importFurnitureFile(file: File): Promise<Item> {
-  const prepared = await prepareFurnitureFile(file);
-  return importModel(prepared.blob, prepared.name);
+export async function importFurnitureFiles(
+  files: File[],
+  report: ImportReport = () => {},
+): Promise<Item> {
+  report("Préparation du dossier et des textures…");
+  const prepared = await prepareInWorker(files);
+  return importModel(prepared.blob, prepared.name, report);
 }
-export async function importModel(blob: Blob, name: string): Promise<Item> {
+export async function importFurnitureFile(
+  file: File,
+  report: ImportReport = () => {},
+): Promise<Item> {
+  report(
+    /\.zip$/i.test(file.name)
+      ? "Décompression du ZIP et intégration des textures…"
+      : "Lecture du fichier 3D…",
+  );
+  const prepared = /\.zip$/i.test(file.name)
+    ? await prepareInWorker(file)
+    : await prepareFurnitureFile(file);
+  return importModel(prepared.blob, prepared.name, report);
+}
+export async function importModel(
+  blob: Blob,
+  name: string,
+  report: ImportReport = () => {},
+): Promise<Item> {
+  report("Décodage du modèle 3D…");
   const gltf = await parseModel(blob);
   const { Box3, Vector3 } = await import("three");
+  report("Calcul des dimensions et des empreintes…");
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
   const box = new Box3().setFromObject(gltf.scene),
     size = box.getSize(new Vector3());
   if (!Number.isFinite(size.length()) || size.length() === 0)
     throw Error("Le modèle ne contient aucune géométrie visible.");
+  const { primeModel, modelFootprints } = await import("./modelAssets");
+  report("Enregistrement du modèle et de ses textures…");
+  const asset = await assetPut(blob);
+  primeModel(asset, gltf, blob.size);
   return {
     id: uid(),
+    footprints: modelFootprints(gltf.scene),
     name: name.replace(/\.(glb|gltf|zip)$/i, ""),
     kind: "model",
     x: 3,
@@ -97,10 +145,11 @@ export async function importModel(blob: Blob, name: string): Promise<Item> {
     height: Math.max(0.01, size.y),
     depth: Math.max(0.01, size.z),
     color: "#c2ac95",
-    asset: await assetPut(blob),
+    asset,
   };
 }
-export async function importURL(raw: string) {
+export async function importURL(raw: string, report: ImportReport = () => {}) {
+  report("Connexion au fichier distant…");
   const url = new URL(raw);
   if (url.protocol !== "https:")
     throw Error("Utilisez une URL HTTPS directe vers un fichier GLB ou glTF.");
@@ -120,9 +169,33 @@ export async function importURL(raw: string) {
     throw Error("Téléchargement refusé (HTTP " + response.status + ").");
   if (Number(response.headers.get("content-length")) > 50 * 1024 * 1024)
     throw Error("Fichier trop volumineux.");
+  let loaded = 0;
+  const total = Number(response.headers.get("content-length")) || undefined;
+  const reader = response.body?.getReader();
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  if (reader) {
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        loaded += value.byteLength;
+        if (loaded > 50 * 1024 * 1024)
+          throw Error("Fichier trop volumineux (50 Mo maximum).");
+        chunks.push(value as Uint8Array<ArrayBuffer>);
+        report(
+          `Téléchargement : ${(loaded / 1024 / 1024).toFixed(1)} Mo${total ? ` / ${(total / 1024 / 1024).toFixed(1)} Mo` : ""}`,
+        );
+      }
+    } catch (e) {
+      await reader.cancel();
+      throw e;
+    }
+  }
+  const blob = reader ? new Blob(chunks) : await response.blob();
   return importModel(
-    await response.blob(),
+    blob,
     decodeURIComponent(url.pathname.split("/").pop()!),
+    report,
   );
 }
 export async function importPlan(file: File) {

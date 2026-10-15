@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { magneticPlacement, type AlignmentGuide } from "./placement";
 import { wallOutline } from "./spatial";
 import { assetGet } from "./db";
 import { useStore } from "./store";
@@ -38,6 +39,13 @@ export default function Plan({
       point: Point;
     } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
+  const [guides, setGuides] = useState<AlignmentGuide[]>([]);
+  const dragStart = useRef<{
+    x: number;
+    y: number;
+    sx: number;
+    sy: number;
+  } | null>(null);
   function fitPlan() {
     if (!p.walls.length) {
       setZoom(1);
@@ -212,6 +220,8 @@ export default function Plan({
       if (e.key === "Escape") {
         setPoints([]);
         setDrag(null);
+        dragStart.current = null;
+        setGuides([]);
       }
     };
     window.addEventListener("keydown", cancel);
@@ -267,14 +277,37 @@ export default function Plan({
               y: o.y - (e.movementY * 0.015) / zoom,
             }));
           }
-          if (drag)
+          if (
+            drag &&
+            dragStart.current &&
+            Math.hypot(
+              e.clientX - dragStart.current.sx,
+              e.clientY - dragStart.current.sy,
+            ) >= 5
+          ) {
+            const i = p.items.find((i) => i.id === drag.id)!;
+            const candidate = {
+              ...i,
+              x: q.x - drag.offset.x,
+              y: q.y - drag.offset.y,
+            };
+            const placement = snap
+              ? magneticPlacement(candidate, p)
+              : { item: candidate, guides: [] };
             setDrag({
               ...drag,
-              point: { x: q.x - drag.offset.x, y: q.y - drag.offset.y },
+              point: { x: placement.item.x, y: placement.item.y },
             });
+            setGuides(placement.guides);
+          }
         }}
         onPointerUp={() => {
-          if (drag) {
+          if (
+            drag &&
+            dragStart.current &&
+            (Math.abs(drag.point.x - dragStart.current.x) > 0.0001 ||
+              Math.abs(drag.point.y - dragStart.current.y) > 0.0001)
+          ) {
             change((p) => {
               const i = p.items.find((i) => i.id === drag.id);
               if (i) {
@@ -282,8 +315,10 @@ export default function Plan({
                 i.y = drag.point.y;
               }
             });
-            setDrag(null);
           }
+          setDrag(null);
+          dragStart.current = null;
+          setGuides([]);
         }}
       >
         <defs>
@@ -415,10 +450,16 @@ export default function Plan({
                 data-item="true"
                 transform={`translate(${pos.x} ${pos.y}) rotate(${i.rotation})`}
                 onPointerDown={(e) => {
-                  if (tool !== "select") return;
+                  if (tool !== "select" || e.button !== 0) return;
                   e.stopPropagation();
                   select(i.id);
                   const q = point(e);
+                  dragStart.current = {
+                    x: i.x,
+                    y: i.y,
+                    sx: e.clientX,
+                    sy: e.clientY,
+                  };
                   setDrag({
                     id: i.id,
                     offset: { x: q.x - i.x, y: q.y - i.y },
@@ -526,6 +567,19 @@ export default function Plan({
               </g>
             );
           })}
+        {guides.map((g, k) => (
+          <line
+            key={"guide" + k}
+            x1={g.a.x}
+            y1={g.a.y}
+            x2={g.b.x}
+            y2={g.b.y}
+            stroke="#397bea"
+            strokeWidth=".02"
+            strokeDasharray=".1 .06"
+            pointerEvents="none"
+          />
+        ))}
         {points.length > 0 && (
           <>
             <polyline

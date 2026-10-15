@@ -642,7 +642,7 @@ test("E masque et réaffiche les alertes sans modifier les meubles", async ({
   await page.getByLabel("Largeur", { exact: true }).fill("10");
   const warning = page
     .locator(".warning")
-    .filter({ hasText: "Ce meuble chevauche" });
+    .filter({ hasText: "Chevauchement possible" });
   const toggle = page.getByRole("button", {
     name: "Alertes de chevauchement",
     exact: true,
@@ -672,4 +672,277 @@ test("E masque et réaffiche les alertes sans modifier les meubles", async ({
   await expect(warning).toHaveCount(0);
   await toggle.click();
   await expect(warning).toBeVisible();
+});
+
+test("navigation 3D : clic droit sûr, caméra conservée, vues et centrage", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Appartement · 48/ }).click();
+  await page
+    .getByRole("button", { name: "Nouvel appartement", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  const canvas = page.locator("canvas");
+  await canvas.screenshot();
+  const box = (await canvas.boundingBox())!;
+  const transfer = await page.evaluateHandle(() => {
+    const d = new DataTransfer();
+    d.setData(
+      "roomora-item",
+      JSON.stringify({
+        id: "table",
+        name: "Table navigation",
+        kind: "table",
+        x: 0,
+        y: 0,
+        width: 1.6,
+        depth: 0.9,
+        height: 0.75,
+        rotation: 0,
+        color: "#ba9470",
+      }),
+    );
+    return d;
+  });
+  await canvas.dispatchEvent("drop", {
+    dataTransfer: transfer,
+    clientX: box.x + box.width / 2,
+    clientY: box.y + box.height / 2,
+  });
+  await expect(page.getByLabel("Nom", { exact: true })).toHaveValue(
+    "Table navigation",
+  );
+  const before = [
+    await page.getByLabel("Position X", { exact: true }).inputValue(),
+    await page.getByLabel("Position Y", { exact: true }).inputValue(),
+  ];
+  const { PerspectiveCamera, Vector3 } = await import("three");
+  const c = new PerspectiveCamera(42, box.width / box.height, 0.05, 500);
+  c.position.set(11.2, 7.6, 11.8);
+  c.lookAt(4, 0, 3);
+  c.updateMatrixWorld();
+  const q = new Vector3(Number(before[0]), 0.73, Number(before[1])).project(c),
+    x = box.x + ((q.x + 1) * box.width) / 2,
+    y = box.y + ((1 - q.y) * box.height) / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(x + 70, y + 20, { steps: 12 });
+  await page.mouse.up({ button: "right" });
+  await expect(page.getByLabel("Position X", { exact: true })).toHaveValue(
+    before[0],
+  );
+  await expect(page.getByLabel("Position Y", { exact: true })).toHaveValue(
+    before[1],
+  );
+  const snapshot = () =>
+    page.evaluate(() => {
+      const key = Object.keys(localStorage).find((k) =>
+        k.startsWith("roomora-camera-"),
+      );
+      return key ? JSON.parse(localStorage.getItem(key)!) : null;
+    });
+  await expect.poll(snapshot).not.toBeNull();
+  const saved = await snapshot();
+  c.position.fromArray(saved.position);
+  c.lookAt(new Vector3(...saved.target));
+  c.updateMatrixWorld();
+  const clickPoint = new Vector3(
+    Number(before[0]),
+    0.73,
+    Number(before[1]),
+  ).project(c);
+  const cx = box.x + ((clickPoint.x + 1) * box.width) / 2,
+    cy = box.y + ((1 - clickPoint.y) * box.height) / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 1, cy + 1);
+  await page.mouse.up();
+
+  expect(
+    saved.target.some(
+      (n: number, i: number) => Math.abs(n - [4, 0, 3][i]) > 0.1,
+    ),
+  ).toBe(true);
+  await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  await canvas.screenshot();
+  await canvas.click({ position: { x: box.width * 0.5, y: box.height * 0.2 } });
+  await page.waitForTimeout(250);
+  const restored = await snapshot();
+  for (let i = 0; i < 3; i++) {
+    expect(restored.position[i]).toBeCloseTo(saved.position[i], 1);
+    expect(restored.target[i]).toBeCloseTo(saved.target[i], 1);
+  }
+  await page.getByTitle("Annuler · ⌘Z").click();
+  await expect(page.locator("footer")).toContainText("0 meubles");
+  await page.getByTitle("Rétablir · ⌘⇧Z").click();
+  await expect(page.locator("footer")).toContainText("1 meubles");
+  await page.getByRole("button", { name: "Dessus", exact: true }).click();
+  await expect
+    .poll(async () => {
+      const s = await snapshot();
+      return (
+        s.position[1] - s.target[1] >
+        Math.hypot(s.position[0] - s.target[0], s.position[2] - s.target[2]) *
+          10
+      );
+    })
+    .toBe(true);
+  await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+  await page.locator(".plan-svg g[data-item] > rect").click();
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  await page.keyboard.press("f");
+  await expect
+    .poll(async () => {
+      const s = await snapshot();
+      return (
+        Math.abs(s.target[0] - Number(before[0])) +
+        Math.abs(s.target[2] - Number(before[1]))
+      );
+    })
+    .toBeLessThan(0.03);
+  const zoomStart = await snapshot();
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+  await page.mouse.wheel(0, -200);
+  await expect
+    .poll(async () => {
+      const v = await snapshot();
+      return Math.hypot(
+        v.target[0] - zoomStart.target[0],
+        v.target[2] - zoomStart.target[2],
+      );
+    })
+    .toBeGreaterThan(0.01);
+  await page
+    .getByRole("button", { name: "Déplacer la vue", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Déplacer la vue", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Aménager", exact: true }).click();
+  await page.keyboard.down("Space");
+  await expect(
+    page.getByRole("button", { name: "Déplacer la vue", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.up("Space");
+});
+
+test("proportions, unités et dissociation d’un ensemble restent sauvegardables", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  const data = Buffer.from(
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 1]).buffer,
+  );
+  const gltf = {
+    asset: { version: "2.0" },
+    scene: 0,
+    scenes: [{ nodes: [0, 1] }],
+    nodes: [
+      { name: "Fauteuil séparé", mesh: 0, translation: [-2, 0, 0] },
+      { name: "Lampe séparée", mesh: 0, translation: [2, 1.5, 0] },
+    ],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    buffers: [
+      {
+        uri: "data:application/octet-stream;base64," + data.toString("base64"),
+        byteLength: 36,
+      },
+    ],
+    bufferViews: [{ buffer: 0, byteLength: 36 }],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+        min: [0, 0, 0],
+        max: [1, 1, 1],
+      },
+    ],
+  };
+  await page.locator('input[accept=".glb,.gltf,.zip"]').setInputFiles({
+    name: "ensemble.gltf",
+    mimeType: "model/gltf+json",
+    buffer: Buffer.from(JSON.stringify(gltf)),
+  });
+  await expect(page.getByLabel("Nom", { exact: true })).toHaveValue("ensemble");
+  await expect(
+    page.getByLabel("Conserver les proportions", { exact: true }),
+  ).toBeChecked();
+  await page.getByLabel("Largeur", { exact: true }).fill("500");
+  await expect(page.getByLabel("Profondeur", { exact: true })).toHaveValue(
+    "100",
+  );
+  await expect(page.getByLabel("Hauteur", { exact: true })).toHaveValue("250");
+  await page
+    .getByText("Corriger l’unité du fichier importé", { exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Interpréter le modèle en cm", exact: true })
+    .click();
+  await expect(page.getByLabel("Largeur", { exact: true })).toHaveValue("5");
+  await expect(page.getByLabel("Profondeur", { exact: true })).toHaveValue("1");
+  await page
+    .getByLabel("Unité de saisie des dimensions", { exact: true })
+    .selectOption("cm");
+  await expect(page.getByLabel("Largeur", { exact: true })).toHaveValue("500");
+  await page
+    .getByLabel("Unité de saisie des dimensions", { exact: true })
+    .selectOption("m");
+  await page.getByLabel("Conserver les proportions", { exact: true }).uncheck();
+  await page.getByLabel("Largeur", { exact: true }).fill("6");
+  await expect(page.getByLabel("Profondeur", { exact: true })).toHaveValue("1");
+  await page
+    .getByRole("button", { name: "Dissocier cet ensemble 3D", exact: true })
+    .click();
+  await expect(
+    page.getByText("Fauteuil séparé", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Dissocier ces 2 sous-objets", exact: true })
+    .click();
+  await expect(page.locator("footer")).toContainText("7 meubles");
+  const dl = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Exporter", exact: true }).click();
+  const d = await dl,
+    stream = await d.createReadStream(),
+    chunks = [];
+  for await (const v of stream!) chunks.push(v);
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const bytes = unzipSync(Buffer.concat(chunks));
+  const p = JSON.parse(strFromU8(bytes["project.json"])),
+    parts = p.items.filter(
+      (i: { modelPart?: string }) => i.modelPart !== undefined,
+    );
+  expect(parts).toHaveLength(2);
+  expect(parts[0].asset).toBe(parts[1].asset);
+  expect(parts[1].elevation).toBeCloseTo(1.5);
+  expect(parts[0].width).toBeCloseTo(1.2);
+  expect(bytes["assets/" + parts[0].asset]).toBeTruthy();
+  await page.getByTitle("Annuler · ⌘Z").click();
+  await expect(page.locator("footer")).toContainText("6 meubles");
+  await page.getByTitle("Rétablir · ⌘⇧Z").click();
+  await expect(page.locator("footer")).toContainText("7 meubles");
+  await page.locator('input[accept=".zip"]').setInputFiles({
+    name: "restauration.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.concat(chunks),
+  });
+  await expect(page.locator("footer")).toContainText("7 meubles");
+  await page
+    .getByRole("button", { name: /Appartement/ })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Stockage de ce navigateur",
+      exact: true,
+    }),
+  ).toBeVisible();
 });

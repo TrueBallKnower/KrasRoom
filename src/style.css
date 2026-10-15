@@ -1770,3 +1770,105 @@ button:focus-visible {
 .toast button {
   pointer-events: auto;
 }
+.camera-toolbar {
+  position: absolute;
+  z-index: 2;
+  right: 18px;
+  top: 82px;
+  display: grid;
+  gap: 7px;
+  max-width: 250px;
+}
+.camera-tools,
+.camera-cube {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 4px;
+  box-shadow: 0 3px 12px #1524370a;
+}
+.camera-tools button,
+.camera-cube button {
+  padding: 8px;
+  font-size: 10px;
+  flex: 1;
+  white-space: nowrap;
+}
+.camera-tools button[aria-pressed="true"] {
+  background: var(--tint);
+  color: var(--green);
+}
+.camera-cube {
+  background: var(--soft);
+}
+.dimension-lock {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  margin-bottom: 15px;
+}
+.unit-correction {
+  margin: 10px 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.unit-correction summary {
+  cursor: pointer;
+  color: var(--green);
+}
+.model-parts {
+  max-height: 40vh;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+.model-parts > div {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.model-parts small {
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 800px) {
+  .camera-toolbar {
+    top: auto;
+    bottom: 145px;
+    right: 8px;
+    max-width: 190px;
+  }
+  .camera-tools button,
+  .camera-cube button {
+    padding: 6px 4px;
+    font-size: 9px;
+  }
+  .camera-tools svg {
+    width: 12px;
+  }
+}
+.storage-status {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+  margin: 14px 0;
+}
+.storage-status h3 {
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+.storage-status p {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.storage-status small {
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+}

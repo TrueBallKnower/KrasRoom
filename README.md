@@ -47,12 +47,19 @@ Le mode manuel reste accessible sous **Je préfère utiliser le tracé manuel �
 ## Aménager et importer vos meubles
 
 - Cliquez sur les meubles intégrés ou glissez-les dans le plan / la scène 3D. Ils sont générés localement à partir de formes simples, sans dépendance à un catalogue externe.
+- Un clic sélectionne ; un glissement gauche d’au moins 5 pixels déplace le meuble. Les clics simples ne créent pas de commande Annuler. L’aimantation rapproche les bords/centres des autres meubles et les murs, avec des guides visuels.
+- **Conserver les proportions** redimensionne les trois axes ensemble. Le panneau accepte m, cm, mm et pouces ; le correcteur d’unité d’import redimensionne les modèles aux unités natives incorrectes.
+- **Dissocier cet ensemble 3D** sépare les sous-groupes présents dans le fichier (2 à 64 à la fois), conserve leur position et élévation, et partage les ressources. La fusion en un seul maillage ne permet pas de retrouver automatiquement les meubles. Annuler reconstitue le groupe ; l’export inclut le fichier commun une seule fois.
 - Glissez un meuble pour le déplacer. Le panneau droit règle ses dimensions, coordonnées, rotation et couleur. Dupliquer, supprimer et placer contre le mur le plus proche sont disponibles.
-- Les alertes signalent les intersections entre empreintes rectangulaires orientées, et les murs. Elles sont indicatives : les ouvertures et la forme détaillée d’un modèle ne sont pas prises en compte. La distance affichée est celle du **centre** au segment du mur, pas la distance libre entre leurs surfaces.
+- Les alertes utilisent des rectangles orientés pour les meubles intégrés et une grille d’occupation simplifiée pour les imports. Les espaces vides, les tapis et les différences d’élévation réduisent les faux chevauchements. Ces contrôles restent indicatifs et ne tiennent pas compte des ouvertures. La distance affichée estime le dégagement entre le **bord** de l’empreinte du meuble et la face du mur.
 - **Ajouter mon propre meuble → Importer un fichier 3D ou un ZIP** accepte GLB / glTF 2.0, jusqu’à 50 Mo. Les ZIP contenant un modèle glTF et ses textures sont intégrés automatiquement, sans extraction manuelle. Le bouton « Mon ZIP est déjà décompressé » accepte aussi le dossier complet. Les données sont enregistrées localement puis incluses dans les exports. Les décodeurs Draco et Meshopt sont fournis avec l’application. Les dimensions natives sont interprétées en mètres et restent modifiables.
 - L’import par URL accepte une adresse HTTPS directe `.glb` / `.gltf`. Le serveur doit autoriser CORS. Une page marchande n’est pas un modèle 3D ; en cas de refus CORS, téléchargez légalement le fichier et importez-le localement.
 - **Créer un meuble de référence** conserve photo, nom, prix et lien produit et génère une forme simplifiée aux dimensions indiquées. La photo n’est pas convertie en modèle fidèle.
 - **Mes meubles** conserve les modèles et références entre projets ; recherche, renommage et suppression sont disponibles. Les meubles existants peuvent aussi être ajoutés à cette collection depuis leurs propriétés.
+
+Les ZIP/dossiers sont préparés dans un worker ; l’import affiche les étapes réelles et le téléchargement par URL indique les octets reçus. Les instances d’un même fichier partagent leur décodage et leurs textures. La vue 3D extérieure ne recalcule des images que pendant une interaction ou une modification ; la visite garde un rendu continu.
+
+Le menu des projets affiche le poids des ressources, l’usage et le quota annoncés par le navigateur. La demande de stockage persistant dépend de son accord. Les limites restent de 50 Mo par modèle et 200/300 Mo par archive de projet ; les quotas ne garantissent pas la capacité de la mémoire graphique.
 
 Respectez les licences des modèles téléchargés. Les meubles intégrés sont créés par le code de Roomora ; ils ne nécessitent pas de modèles payants.
 
@@ -70,7 +77,8 @@ Les données appartiennent à ce navigateur, cet appareil et cette origine web. 
 - ⌘/Ctrl D : dupliquer ; R : rotation de 15° ; Suppr : supprimer.
 - Échap : terminer le tracé / revenir à la sélection.
 - Plan : boutons +/− pour zoomer ; déplacement avec le bouton central de la souris.
-- 3D : glisser pour tourner, molette pour zoomer ; glisser un meuble pour le déplacer.
+- 3D : gauche sur le fond pour tourner ; **clic droit ou Espace + glisser** pour déplacer la caméra, y compris au-dessus d’un meuble ; molette pour zoomer vers le curseur. Le mode **Déplacer la vue** permet aussi de naviguer avec le bouton gauche.
+- **F** centre la sélection ; **Tout voir** cadre l’appartement. Les boutons Dessus / Face / Côté / vue isométrique changent l’orientation. La caméra est mémorisée par projet dans ce navigateur, y compris lors du passage 2D → 3D et après rechargement.
 - Visite : cliquer dans la scène, ZQSD ou WASD et flèches pour avancer, Échap pour libérer la souris. Ce mode est prévu pour souris/clavier, sans collision physique.
 - **Rendu → Réaliste** active un éclairage ambiant calculé localement, des arêtes adoucies et des matières textiles. Aucun HDRI externe ni clé API.
 - Cliquez sur une pièce en 2D ou sur son sol en 3D pour choisir chêne, noyer, parquet clair, carrelage, béton ou couleur unie. Les textures sont procédurales, les dimensions restent inchangées et les choix sont inclus dans les sauvegardes.
@@ -108,7 +116,10 @@ L’adresse attendue est `https://trueballknower.github.io/Roomora/` ; sa prése
 - `src/model.ts` : données, géométrie, dimensions, collisions et appartement initial.
 - `src/store.ts` : état d’édition et historique (80 commandes).
 - `src/Plan.tsx` : fond de plan, calibrage, outils 2D et déplacement.
-- `src/Scene.tsx` : géométrie 3D, éclairage, caméras et interactions.
+- `src/Scene.tsx`, `src/NavigationCamera.tsx`, `src/CameraToolbar.tsx`, `src/navigation.ts` : géométrie, éclairage, navigation et caméra persistante.
+- `src/placement.ts`, `src/DimensionsEditor.tsx` : alignement, dégagements et échelle.
+- `src/modelAssets.ts`, `src/SplitModel.tsx` : cache partagé, empreintes et dissociation.
+- `src/bundle.worker.ts`, `src/StorageStatus.tsx` : préparation hors du fil principal et stockage.
 - `src/imports.ts` : validation des modèles, URL et rasterisation PDF.
 - `src/AutoPlanImport.tsx`, `src/detection/` : import automatique, analyse locale en worker, segmentation et reconstruction.
 - `src/db.ts` : IndexedDB et sauvegardes portables.
