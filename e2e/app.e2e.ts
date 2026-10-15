@@ -60,11 +60,13 @@ test("modèle glTF intégré, rendu 3D et bibliothèque personnelle", async ({
       },
     ],
   };
-  await page.locator('input[type=file][accept=".glb,.gltf"]').setInputFiles({
-    name: "test.gltf",
-    mimeType: "model/gltf+json",
-    buffer: Buffer.from(JSON.stringify(gltf)),
-  });
+  await page
+    .locator('input[type=file][accept=".glb,.gltf,.zip"]')
+    .setInputFiles({
+      name: "test.gltf",
+      mimeType: "model/gltf+json",
+      buffer: Buffer.from(JSON.stringify(gltf)),
+    });
   await expect(page.getByLabel("Nom", { exact: true })).toHaveValue("test");
   await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
   await expect(page.locator("canvas")).toBeVisible();
@@ -141,7 +143,7 @@ test("plan PDF, calibration et restauration ZIP avec un modèle GLB", async ({
   glb.writeUInt32LE(binary.length, 20 + padded.length);
   glb.writeUInt32LE(0x004e4942, 24 + padded.length);
   binary.copy(glb, 28 + padded.length);
-  await page.locator('input[accept=".glb,.gltf"]').setInputFiles({
+  await page.locator('input[accept=".glb,.gltf,.zip"]').setInputFiles({
     name: "Triangle.glb",
     mimeType: "model/gltf-binary",
     buffer: glb,
@@ -421,6 +423,7 @@ test("placement et déplacement directs dans la vue 3D, rotation et visite régl
   await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
   const canvas = page.locator("canvas");
   await expect(canvas).toBeVisible();
+  await canvas.screenshot();
   const box = await canvas.boundingBox();
   if (!box) throw Error("Canvas absent");
   const transfer = await page.evaluateHandle(() => {
@@ -489,4 +492,130 @@ test("placement et déplacement directs dans la vue 3D, rotation et visite régl
   await expect(
     page.getByLabel("Vitesse de visite", { exact: true }),
   ).toBeVisible();
+});
+
+test("ZIP glTF texturé, rendu réaliste et parquet conservés dans la sauvegarde", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const { zipSync, strToU8, unzipSync, strFromU8 } = await import("fflate");
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  const png = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 2;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "#367be0";
+    x.fillRect(0, 0, 2, 2);
+    return c.toDataURL().split(",")[1];
+  });
+  const pos = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 1]);
+  const gltf = {
+    asset: { version: "2.0" },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+    buffers: [{ uri: "mesh.bin", byteLength: pos.byteLength }],
+    bufferViews: [{ buffer: 0, byteLength: pos.byteLength }],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+        min: [0, 0, 0],
+        max: [1, 1, 1],
+      },
+    ],
+    images: [{ uri: "textures/fabric.png" }],
+    textures: [{ source: 0 }],
+    materials: [
+      {
+        pbrMetallicRoughness: {
+          baseColorTexture: { index: 0 },
+          metallicFactor: 0,
+          roughnessFactor: 0.8,
+        },
+      },
+    ],
+  };
+  const archive = zipSync({
+    "meuble/scene.gltf": strToU8(JSON.stringify(gltf)),
+    "meuble/mesh.bin": new Uint8Array(pos.buffer),
+    "meuble/textures/fabric.png": new Uint8Array(Buffer.from(png, "base64")),
+  });
+  await page
+    .getByRole("button", { name: "Ajouter mon propre meuble", exact: true })
+    .click();
+  await expect(page.getByRole("link", { name: /Sketchfab/ })).toBeVisible();
+  await page.locator('input[accept=".glb,.gltf,.zip"]').setInputFiles({
+    name: "Fauteuil-texture.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from(archive),
+  });
+  await expect(page.getByLabel("Nom", { exact: true })).toHaveValue(
+    "Fauteuil-texture",
+  );
+  await expect(page.getByLabel("Style de rendu", { exact: true })).toHaveValue(
+    "realistic",
+  );
+  await expect(page.locator("canvas")).toBeVisible();
+  await page
+    .getByLabel("Style de rendu", { exact: true })
+    .selectOption("standard");
+  await page
+    .getByLabel("Style de rendu", { exact: true })
+    .selectOption("realistic");
+  await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+  await page
+    .locator(".plan-svg polygon")
+    .first()
+    .click({ position: { x: 40, y: 40 } });
+  await page
+    .getByRole("button", { name: "Parquet chêne naturel", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Parquet chêne naturel", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Exporter", exact: true }).click();
+  const file = await download;
+  const stream = await file.createReadStream();
+  const chunks = [];
+  for await (const c of stream!) chunks.push(c);
+  const exported = unzipSync(Buffer.concat(chunks));
+  const project = JSON.parse(strFromU8(exported["project.json"]));
+  expect(project.rooms[0].finish).toBe("oak");
+  const item = project.items.find(
+    (i: { name: string }) => i.name === "Fauteuil-texture",
+  );
+  const saved = JSON.parse(strFromU8(exported["assets/" + item.asset]));
+  expect(saved.images[0].uri).toContain("data:image/png;base64,");
+  expect(saved.buffers[0].uri).toContain(
+    "data:application/octet-stream;base64,",
+  );
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  await page.screenshot({ path: "/tmp/roomora-realistic-floor.png" });
+  expect(errors).toEqual([]);
+});
+
+test("importe un GLB Draco avec le décodeur fourni par Roomora", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  const decoded = page.waitForResponse(
+    (r) => r.url().includes("/decoders/draco/draco_decoder.wasm") && r.ok(),
+  );
+  await page
+    .locator('input[accept=".glb,.gltf,.zip"]')
+    .setInputFiles("e2e/fixtures/draco-triangle.glb");
+  await decoded;
+  await expect(page.getByLabel("Nom", { exact: true })).toHaveValue(
+    "draco-triangle",
+  );
+  await expect(page.getByLabel("Largeur", { exact: true })).toHaveValue("1");
 });

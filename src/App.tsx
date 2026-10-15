@@ -63,7 +63,14 @@ import {
   exportProject,
   importProject,
 } from "./db";
-import { importPlan, importModel, importURL } from "./imports";
+import {
+  importPlan,
+  importFurnitureFile,
+  importFurnitureFiles,
+  importURL,
+} from "./imports";
+import { floorFinishes } from "./floorFinishes";
+import FurnitureSources from "./FurnitureSources";
 import AssetImage from "./AssetImage";
 import { visitStart } from "./spatial";
 import FurniturePreview from "./FurniturePreview";
@@ -123,6 +130,7 @@ export default function App() {
     [transparent, setTransparent] = useState(true),
     [ceiling, setCeiling] = useState(false),
     [quality, setQuality] = useState(false),
+    [realistic, setRealistic] = useState(false),
     [eyeHeight, setEyeHeight] = useState(1.55),
     [fieldOfView, setFieldOfView] = useState(72),
     [walkSpeed, setWalkSpeed] = useState(1.4),
@@ -147,6 +155,7 @@ export default function App() {
   const [autoFile, setAutoFile] = useState<File>();
   const planInput = useRef<HTMLInputElement>(null),
     modelInput = useRef<HTMLInputElement>(null),
+    furnitureFolderInput = useRef<HTMLInputElement>(null),
     backupInput = useRef<HTMLInputElement>(null);
   const notify = useCallback((s: string) => setMessage(s), []);
   const item = p.items.find((i) => i.id === selected),
@@ -265,6 +274,22 @@ export default function App() {
     } finally {
       setBusy(false);
     }
+  }
+  function loadFurniture(file: File | File[]) {
+    return run(async () => {
+      const i = await (Array.isArray(file)
+        ? importFurnitureFiles(file)
+        : importFurnitureFile(file));
+      await libraryPut(i);
+      setPersonal(await library());
+      setModal(null);
+      setView("3d");
+      setRealistic(true);
+      add(i);
+      notify(
+        "Meuble et textures enregistrés dans Mes meubles. Vérifiez ses dimensions en mètres.",
+      );
+    });
   }
   function add(i: Item) {
     const id = uid();
@@ -637,6 +662,10 @@ export default function App() {
           onDrop={(e) => {
             e.preventDefault();
             const file = e.dataTransfer.files[0];
+            if (file && /\.(glb|gltf|zip)$/i.test(file.name)) {
+              void loadFurniture(file);
+              return;
+            }
             if (file) {
               setAutoFile(file);
               setModal("autoPlan");
@@ -783,6 +812,7 @@ export default function App() {
                     ceiling={ceiling}
                     hide={hide}
                     quality={quality}
+                    realistic={realistic}
                     onError={notify}
                   />
                 </Suspense>
@@ -890,6 +920,21 @@ export default function App() {
                   </div>
                 )}
                 <div className="render-controls">
+                  <label>
+                    Rendu{" "}
+                    <select
+                      aria-label="Style de rendu"
+                      value={realistic ? "realistic" : "standard"}
+                      onChange={(e) =>
+                        setRealistic(e.target.value === "realistic")
+                      }
+                    >
+                      <option value="standard">Standard · fluide</option>
+                      <option value="realistic">
+                        Réaliste · matières et lumière
+                      </option>
+                    </select>
+                  </label>
                   <label>
                     <input
                       type="checkbox"
@@ -1297,6 +1342,32 @@ export default function App() {
                 {area(room.points).toFixed(2)}
                 <small>m²</small>
               </p>
+              <div className="floor-finishes">
+                <h4>Revêtement du sol</h4>
+                <div className="floor-options">
+                  {floorFinishes.map((f) => (
+                    <button
+                      key={f.id}
+                      className={
+                        (room.finish || "plain") === f.id ? "active" : ""
+                      }
+                      aria-pressed={(room.finish || "plain") === f.id}
+                      onClick={() =>
+                        change((p) => {
+                          p.rooms.find((r) => r.id === room.id)!.finish = f.id;
+                        })
+                      }
+                    >
+                      <span style={{ background: f.color }} />
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+                <small>
+                  Visible en 3D, conservé dans la sauvegarde. Choisissez «
+                  Couleur unie » pour utiliser la couleur ci-dessous.
+                </small>
+              </div>
               <label className="field">
                 Couleur du sol
                 <input
@@ -1368,20 +1439,23 @@ export default function App() {
         ref={modelInput}
         hidden
         type="file"
-        accept=".glb,.gltf"
+        accept=".glb,.gltf,.zip"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f)
-            run(async () => {
-              const i = await importModel(f, f.name);
-              add(i);
-              await libraryPut(i);
-              setPersonal(await library());
-              setModal(null);
-              notify(
-                "Modèle importé. Vérifiez ses dimensions : glTF utilise des mètres.",
-              );
-            });
+          if (f) void loadFurniture(f);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={furnitureFolderInput}
+        hidden
+        type="file"
+        {...{ webkitdirectory: "" }}
+        multiple
+        aria-label="Dossier du meuble 3D"
+        onChange={(e) => {
+          const files = Array.from(e.target.files || []);
+          if (files.length) void loadFurniture(files);
           e.target.value = "";
         }}
       />
@@ -1548,18 +1622,39 @@ export default function App() {
                   Importez un vrai modèle ou créez une référence à ses
                   dimensions.
                 </p>
+                <FurnitureSources />
                 <button
-                  className="import-option"
+                  className="import-option furniture-file-drop"
+                  disabled={busy}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const f = e.dataTransfer.files[0];
+                    if (f) void loadFurniture(f);
+                  }}
                   onClick={() => modelInput.current?.click()}
                 >
                   <Box />
                   <div>
-                    <strong>Importer un fichier 3D</strong>
+                    <strong>
+                      {busy
+                        ? "Préparation du meuble…"
+                        : "Importer un fichier 3D ou un ZIP"}
+                    </strong>
                     <p>
-                      GLB ou glTF 2.0 avec ressources intégrées · 50 Mo max.
+                      Déposez un GLB ou un ZIP glTF avec ses textures · 50 Mo
+                      max.
                     </p>
                   </div>
                   <Plus size={18} />
+                </button>
+                <button
+                  className="outline full"
+                  disabled={busy}
+                  onClick={() => furnitureFolderInput.current?.click()}
+                >
+                  Mon ZIP est déjà décompressé : choisir le dossier
                 </button>
                 <form
                   onSubmit={(e) => {
@@ -1570,6 +1665,8 @@ export default function App() {
                       await libraryPut(i);
                       setPersonal(await library());
                       setModal(null);
+                      setView("3d");
+                      setRealistic(true);
                     });
                   }}
                 >
@@ -1606,8 +1703,9 @@ export default function App() {
                 </button>
                 <p className="notice">
                   Une URL de page marchande ne contient pas forcément de modèle
-                  3D. Les restrictions CORS sont respectées. OBJ/MTL et modèles
-                  compressés Draco/KTX2 ne sont pas pris en charge.
+                  3D. Les restrictions CORS sont respectées. Les ZIP glTF et la
+                  compression Draco sont acceptés. OBJ/MTL et textures KTX2 ne
+                  sont pas pris en charge.
                 </p>
               </>
             ) : modal === "reference" ? (

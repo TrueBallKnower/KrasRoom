@@ -1,4 +1,13 @@
-import { Suspense, useEffect, useMemo, useState, useRef } from "react";
+import {
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  useRef,
+  createContext,
+  useContext,
+} from "react";
 import {
   Canvas,
   useThree,
@@ -10,9 +19,13 @@ import {
   PointerLockControls,
   Grid,
   ContactShadows,
+  RoundedBox,
 } from "@react-three/drei";
 import {
   Box3,
+  PMREMGenerator,
+  ACESFilmicToneMapping,
+  NeutralToneMapping,
   Vector3,
   Shape,
   DoubleSide,
@@ -20,7 +33,10 @@ import {
   Raycaster,
   Vector2,
   type Group,
+  type Texture,
 } from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { surfaceTexture } from "./materials";
 import { wallOutline, visitStart } from "./spatial";
 import { assetGet } from "./db";
 import { parseModel } from "./imports";
@@ -33,15 +49,69 @@ import {
   type Wall,
   type Room,
 } from "./model";
+const RealismContext = createContext(false);
+const FabricContext = createContext<Texture | null>(null);
+function StudioLighting({ realistic }: { realistic: boolean }) {
+  const { scene, gl } = useThree();
+  useEffect(() => {
+    const old = scene.environment,
+      oldTone = gl.toneMapping,
+      oldExposure = gl.toneMappingExposure;
+    gl.toneMapping = realistic ? ACESFilmicToneMapping : NeutralToneMapping;
+    gl.toneMappingExposure = realistic ? 1.05 : 1;
+    if (!realistic)
+      return () => {
+        gl.toneMapping = oldTone;
+        gl.toneMappingExposure = oldExposure;
+      };
+    const generator = new PMREMGenerator(gl),
+      room = new RoomEnvironment();
+    const target = generator.fromScene(room, 0.04);
+    scene.environment = target.texture;
+    scene.environmentIntensity = 0.5;
+    return () => {
+      scene.environment = old;
+      target.dispose();
+      room.dispose();
+      generator.dispose();
+      gl.toneMapping = oldTone;
+      gl.toneMappingExposure = oldExposure;
+    };
+  }, [scene, gl, realistic]);
+  return null;
+}
 function Box({
   position = [0, 0, 0],
   size,
   color,
+  fabric = false,
 }: {
   position?: [number, number, number];
   size: [number, number, number];
   color: string;
+  fabric?: boolean;
 }) {
+  const realistic = useContext(RealismContext);
+  const texture = useContext(FabricContext);
+  if (realistic)
+    return (
+      <RoundedBox
+        args={size}
+        radius={Math.min(0.035, ...size.map((v) => v * 0.12))}
+        smoothness={2}
+        position={position}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial
+          color={color}
+          map={fabric ? texture : null}
+          bumpMap={fabric ? texture : null}
+          bumpScale={0.004}
+          roughness={fabric ? 0.9 : 0.65}
+        />
+      </RoundedBox>
+    );
   return (
     <mesh castShadow receiveShadow position={position}>
       <boxGeometry args={size} />
@@ -74,17 +144,20 @@ function BuiltIn({ i }: { i: Item }) {
     return (
       <>
         <Box
+          fabric
           size={[w * 0.9, h * 0.42, d * 0.9]}
           position={[0, h * 0.3, 0]}
           color={c}
         />
         <Box
+          fabric
           size={[w, h * 0.58, d * 0.18]}
           position={[0, h * 0.68, -d * 0.4]}
           color={c}
         />
         {[-1, 1].map((s) => (
           <Box
+            fabric
             key={s}
             size={[w * 0.12, h * 0.5, d]}
             position={[s * w * 0.44, h * 0.5, 0]}
@@ -94,6 +167,7 @@ function BuiltIn({ i }: { i: Item }) {
         {[-1, 1].flatMap((x) =>
           [-1, 1].map((z) => (
             <Box
+              fabric
               key={x + ":" + z}
               size={[0.07, h * 0.12, 0.07]}
               position={[x * w * 0.38, h * 0.06, z * d * 0.35]}
@@ -110,6 +184,7 @@ function BuiltIn({ i }: { i: Item }) {
         <Box
           size={[w * 0.96, h * 0.25, d * 0.93]}
           position={[0, h * 0.63, 0]}
+          fabric
           color="#f4eee5"
         />
         <Box size={[w, h, 0.1]} position={[0, h * 0.5, -d * 0.48]} color={c} />
@@ -118,6 +193,7 @@ function BuiltIn({ i }: { i: Item }) {
             key={s}
             size={[w * 0.4, 0.12, d * 0.18]}
             position={[s * w * 0.24, h * 0.82, -d * 0.31]}
+            fabric
             color="#fffaf2"
           />
         ))}
@@ -323,6 +399,14 @@ function WallMesh({
   );
 }
 function Floor({ r, ceiling }: { r: Room; ceiling?: boolean }) {
+  const select = useStore((s) => s.select);
+  const realistic = useContext(RealismContext);
+  const finish = r.finish || "plain";
+  const texture = useMemo(
+    () => (!ceiling && finish !== "plain" ? surfaceTexture(finish) : null),
+    [finish, ceiling],
+  );
+  useEffect(() => () => texture?.dispose(), [texture]);
   const shape = useMemo(() => {
     const s = new Shape();
     r.points.forEach((p, i) => (i ? s.lineTo(p.x, -p.y) : s.moveTo(p.x, -p.y)));
@@ -333,11 +417,21 @@ function Floor({ r, ceiling }: { r: Room; ceiling?: boolean }) {
     <mesh
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, ceiling ? 2.6 : 0, 0]}
+      onClick={(e) => {
+        if (!ceiling && !document.pointerLockElement) {
+          e.stopPropagation();
+          select(r.id);
+        }
+      }}
       receiveShadow
     >
       <shapeGeometry args={[shape]} />
       <meshStandardMaterial
-        color={ceiling ? "#eee9e2" : r.color}
+        color={ceiling ? "#eee9e2" : texture ? "#ffffff" : r.color}
+        map={texture}
+        bumpMap={realistic ? texture : null}
+        bumpScale={finish === "tile" ? 0.012 : 0.006}
+        roughness={finish === "tile" ? 0.48 : 0.78}
         side={DoubleSide}
       />
     </mesh>
@@ -427,11 +521,12 @@ function FitCamera({
   walk: boolean;
 }) {
   const { camera } = useThree();
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!walk) {
       camera.position.set(x + span * 0.9, span * 0.95, y + span * 1.1);
       camera.lookAt(x, 0, y);
       camera.updateProjectionMatrix();
+      camera.updateMatrixWorld();
     }
   }, [camera, id, walk, x, y, span]);
   return null;
@@ -489,7 +584,9 @@ export default function Scene({
   eyeHeight = 1.55,
   fieldOfView = 72,
   walkSpeed = 1.4,
+  realistic = false,
 }: {
+  realistic?: boolean;
   eyeHeight?: number;
   fieldOfView?: number;
   walkSpeed?: number;
@@ -502,6 +599,11 @@ export default function Scene({
   onError: (s: string) => void;
 }) {
   const { project: p, selected, select, change } = useStore();
+  const fabricTexture = useMemo(
+    () => (realistic ? surfaceTexture("fabric") : null),
+    [realistic],
+  );
+  useEffect(() => () => fabricTexture?.dispose(), [fabricTexture]);
   const bounds = useMemo(() => {
     const points = p.walls.flatMap((w) => [w.a, w.b]);
     if (!points.length) return { x: 4, y: 3, span: 8 };
@@ -573,129 +675,143 @@ export default function Scene({
       }}
       onPointerMissed={() => select(null)}
     >
-      <FitCamera id={p.id} {...bounds} walk={walk} />
-      <DropFurniture />
-      <color attach="background" args={["#e8eae6"]} />
-      <ambientLight intensity={1.1} />
-      <hemisphereLight args={["#f9f6ef", "#8b9b8a", 1]} />
-      <directionalLight
-        position={[3, 12, 5]}
-        intensity={2}
-        castShadow
-        shadow-mapSize={quality ? 2048 : 1024}
-        shadow-camera-left={-12}
-        shadow-camera-right={12}
-        shadow-camera-top={12}
-        shadow-camera-bottom={-12}
-      />
-      <Grid
-        infiniteGrid
-        fadeDistance={40}
-        cellSize={1}
-        sectionSize={5}
-        cellColor="#b7bfb6"
-        sectionColor="#a4afa2"
-        position={[0, -0.035, 0]}
-      />
-      {p.rooms.map((r) => (
-        <group key={r.id}>
-          <Floor r={r} />
-          {ceiling && <Floor r={r} ceiling />}
-        </group>
-      ))}
-      {p.walls.map((w) => (
-        <WallMesh
-          key={w.id}
-          w={w}
-          walls={p.walls}
-          transparent={transparent && !walk}
-        />
-      ))}
-      {!hide &&
-        p.items.map((i) => (
-          <group
-            key={i.id}
-            position={[
-              drag?.id === i.id ? drag.x : i.x,
-              0,
-              drag?.id === i.id ? drag.y : i.y,
-            ]}
-            rotation={[0, (-i.rotation * Math.PI) / 180, 0]}
-            onClick={(e) => {
-              e.stopPropagation();
-              select(i.id);
-            }}
-            onPointerMove={move}
-            onPointerUp={finish}
-            onPointerDown={(e) => {
-              if (walk) return;
-              e.stopPropagation();
-              select(i.id);
-              if (orbit.current) orbit.current.enabled = false;
-              const q = e.ray.intersectPlane(ground, new Vector3());
-              if (q)
-                setDrag({
-                  id: i.id,
-                  x: i.x,
-                  y: i.y,
-                  dx: q.x - i.x,
-                  dy: q.z - i.y,
-                });
-              (e.target as Element).setPointerCapture(e.pointerId);
-            }}
-          >
-            <Suspense fallback={null}>
-              {i.asset ? <Model i={i} onError={onError} /> : <BuiltIn i={i} />}
-            </Suspense>
-            {(selected === i.id ||
-              collides(
-                drag?.id === i.id ? { ...i, x: drag.x, y: drag.y } : i,
-                p,
-              )) && (
-              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
-                <planeGeometry args={[i.width + 0.08, i.depth + 0.08]} />
-                <meshBasicMaterial
-                  color={
-                    collides(
-                      drag?.id === i.id ? { ...i, x: drag.x, y: drag.y } : i,
-                      p,
-                    )
-                      ? "#dc725e"
-                      : "#41796b"
-                  }
-                  transparent
-                  opacity={0.5}
-                />
-              </mesh>
-            )}
-          </group>
-        ))}
-      {quality && (
-        <ContactShadows
-          position={[4, 0.005, 3]}
-          scale={20}
-          opacity={0.3}
-          blur={2}
-          far={5}
-        />
-      )}{" "}
-      {walk ? (
-        <Walk
-          eyeHeight={eyeHeight}
-          fieldOfView={fieldOfView}
-          speed={walkSpeed}
-        />
-      ) : (
-        <OrbitControls
-          ref={orbit}
-          makeDefault
-          enableDamping
-          dampingFactor={0.1}
-          enabled={!drag}
-          target={[bounds.x, 0, bounds.y]}
-          maxPolarAngle={Math.PI / 2 - 0.03}
-        />
-      )}
+      <RealismContext.Provider value={realistic}>
+        <FabricContext.Provider value={fabricTexture}>
+          <StudioLighting realistic={realistic} />
+          <FitCamera id={p.id} {...bounds} walk={walk} />
+          <DropFurniture />
+          <color attach="background" args={["#e8eae6"]} />
+          <ambientLight intensity={realistic ? 0.45 : 1.1} />
+          <hemisphereLight args={["#f9f6ef", "#8b9b8a", 1]} />
+          <directionalLight
+            position={[3, 12, 5]}
+            intensity={realistic ? 2.5 : 2}
+            castShadow
+            shadow-mapSize={quality ? 2048 : 1024}
+            shadow-camera-left={-12}
+            shadow-camera-right={12}
+            shadow-camera-top={12}
+            shadow-camera-bottom={-12}
+          />
+          <Grid
+            infiniteGrid
+            fadeDistance={40}
+            cellSize={1}
+            sectionSize={5}
+            cellColor="#b7bfb6"
+            sectionColor="#a4afa2"
+            position={[0, -0.035, 0]}
+          />
+          {p.rooms.map((r) => (
+            <group key={r.id}>
+              <Floor r={r} />
+              {ceiling && <Floor r={r} ceiling />}
+            </group>
+          ))}
+          {p.walls.map((w) => (
+            <WallMesh
+              key={w.id}
+              w={w}
+              walls={p.walls}
+              transparent={transparent && !walk}
+            />
+          ))}
+          {!hide &&
+            p.items.map((i) => (
+              <group
+                key={i.id}
+                position={[
+                  drag?.id === i.id ? drag.x : i.x,
+                  0,
+                  drag?.id === i.id ? drag.y : i.y,
+                ]}
+                rotation={[0, (-i.rotation * Math.PI) / 180, 0]}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  select(i.id);
+                }}
+                onPointerMove={move}
+                onPointerUp={finish}
+                onPointerDown={(e) => {
+                  if (walk) return;
+                  e.stopPropagation();
+                  select(i.id);
+                  if (orbit.current) orbit.current.enabled = false;
+                  const q = e.ray.intersectPlane(ground, new Vector3());
+                  if (q)
+                    setDrag({
+                      id: i.id,
+                      x: i.x,
+                      y: i.y,
+                      dx: q.x - i.x,
+                      dy: q.z - i.y,
+                    });
+                  (e.target as Element).setPointerCapture(e.pointerId);
+                }}
+              >
+                <Suspense fallback={null}>
+                  {i.asset ? (
+                    <Model i={i} onError={onError} />
+                  ) : (
+                    <BuiltIn i={i} />
+                  )}
+                </Suspense>
+                {(selected === i.id ||
+                  collides(
+                    drag?.id === i.id ? { ...i, x: drag.x, y: drag.y } : i,
+                    p,
+                  )) && (
+                  <mesh
+                    rotation={[-Math.PI / 2, 0, 0]}
+                    position={[0, 0.015, 0]}
+                  >
+                    <planeGeometry args={[i.width + 0.08, i.depth + 0.08]} />
+                    <meshBasicMaterial
+                      color={
+                        collides(
+                          drag?.id === i.id
+                            ? { ...i, x: drag.x, y: drag.y }
+                            : i,
+                          p,
+                        )
+                          ? "#dc725e"
+                          : "#41796b"
+                      }
+                      transparent
+                      opacity={0.5}
+                    />
+                  </mesh>
+                )}
+              </group>
+            ))}
+          {(quality || realistic) && (
+            <ContactShadows
+              position={[4, 0.005, 3]}
+              scale={20}
+              opacity={0.3}
+              blur={2}
+              far={5}
+            />
+          )}{" "}
+          {walk ? (
+            <Walk
+              eyeHeight={eyeHeight}
+              fieldOfView={fieldOfView}
+              speed={walkSpeed}
+            />
+          ) : (
+            <OrbitControls
+              ref={orbit}
+              makeDefault
+              enableDamping
+              dampingFactor={0.1}
+              enabled={!drag}
+              target={[bounds.x, 0, bounds.y]}
+              maxPolarAngle={Math.PI / 2 - 0.03}
+            />
+          )}
+        </FabricContext.Provider>
+      </RealismContext.Provider>
     </Canvas>
   );
 }

@@ -34,7 +34,13 @@ export type Item = {
   price?: string;
   url?: string;
 };
-export type Room = { id: string; name: string; points: Point[]; color: string };
+export type Room = {
+  id: string;
+  name: string;
+  points: Point[];
+  color: string;
+  finish?: import("./floorFinishes").FloorFinish;
+};
 export type Project = {
   version: 1;
   id: string;
@@ -315,6 +321,10 @@ export function validateProject(v: unknown): asserts v is Project {
     if (
       !text(r.name) ||
       !color(r.color) ||
+      (r.finish !== undefined &&
+        !["plain", "oak", "walnut", "ash", "tile", "concrete"].includes(
+          r.finish,
+        )) ||
       !Array.isArray(r.points) ||
       r.points.length < 3 ||
       r.points.some((q) => !point(q))

@@ -1,5 +1,6 @@
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import worker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { prepareFurnitureFile, prepareFurnitureFolder } from "./modelBundle";
 import { assetPut } from "./db";
 import { uid, type Item } from "./model";
 export async function parseModel(blob: Blob) {
@@ -37,24 +38,46 @@ export async function parseModel(blob: Blob) {
   for (const r of [...(json.buffers || []), ...(json.images || [])])
     if (r.uri && !r.uri.startsWith("data:"))
       throw Error(
-        "Ce modèle utilise des fichiers externes. Exportez-le en GLB ou glTF avec ressources intégrées.",
+        "Ce glTF utilise des fichiers externes. Importez le ZIP complet du téléchargement avec ses textures, ou choisissez le format GLB.",
       );
-  if (
-    (json.extensionsRequired || []).some((v: string) =>
-      ["KHR_draco_mesh_compression", "KHR_texture_basisu"].includes(v),
-    )
-  )
+  if ((json.extensionsRequired || []).includes("KHR_texture_basisu"))
     throw Error(
-      "Compression Draco/KTX2 non prise en charge. Exportez un GLB sans cette compression.",
+      "Textures KTX2 non prises en charge. Choisissez des textures PNG/JPG sur le site source.",
     );
   const { GLTFLoader } =
     await import("three/examples/jsm/loaders/GLTFLoader.js");
-  const loader = new GLTFLoader();
+  const { DRACOLoader } =
+    await import("three/examples/jsm/loaders/DRACOLoader.js");
+  const { MeshoptDecoder } =
+    await import("three/examples/jsm/libs/meshopt_decoder.module.js");
+  const draco = new DRACOLoader().setDecoderPath(
+    import.meta.env.BASE_URL + "decoders/draco/",
+  );
+  const loader = new GLTFLoader()
+    .setDRACOLoader(draco)
+    .setMeshoptDecoder(MeshoptDecoder);
   return new Promise<GLTF>((resolve, reject) =>
-    loader.parse(bytes, "", resolve, (e) =>
-      reject(Error("Chargement du modèle impossible : " + String(e))),
+    loader.parse(
+      bytes,
+      "",
+      (g) => {
+        draco.dispose();
+        resolve(g);
+      },
+      (e) => {
+        draco.dispose();
+        reject(Error("Chargement du modèle impossible : " + String(e)));
+      },
     ),
   );
+}
+export async function importFurnitureFiles(files: File[]): Promise<Item> {
+  const prepared = await prepareFurnitureFolder(files);
+  return importModel(prepared.blob, prepared.name);
+}
+export async function importFurnitureFile(file: File): Promise<Item> {
+  const prepared = await prepareFurnitureFile(file);
+  return importModel(prepared.blob, prepared.name);
 }
 export async function importModel(blob: Blob, name: string): Promise<Item> {
   const gltf = await parseModel(blob);
@@ -65,7 +88,7 @@ export async function importModel(blob: Blob, name: string): Promise<Item> {
     throw Error("Le modèle ne contient aucune géométrie visible.");
   return {
     id: uid(),
-    name: name.replace(/\.(glb|gltf)$/i, ""),
+    name: name.replace(/\.(glb|gltf|zip)$/i, ""),
     kind: "model",
     x: 3,
     y: 3,

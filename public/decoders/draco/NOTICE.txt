@@ -1,0 +1,6 @@
+Draco geometry decoder
+Copyright 2016 The Draco Authors. All rights reserved.
+Source: https://github.com/google/draco
+License: Apache License 2.0 (LICENSE.txt)
+Decoder binaries distributed with Three.js 0.180.0 examples.
+Three.js license: THREE-LICENSE.txt

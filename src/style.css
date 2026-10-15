@@ -1686,3 +1686,87 @@ button:focus-visible {
 .furniture-card[draggable="true"]:active {
   cursor: grabbing;
 }
+.furniture-sources {
+  padding: 16px;
+  background: var(--soft);
+  border-radius: 12px;
+  margin: 18px 0;
+  border: 1px solid var(--line);
+}
+.furniture-sources h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+.furniture-sources p,
+.furniture-sources small {
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.source-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0;
+}
+.source-links a {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12px;
+}
+.source-links small {
+  margin-top: 5px;
+  font-weight: 400;
+  font-size: 10px;
+}
+.furniture-file-drop {
+  border: 1px dashed var(--green);
+  background: var(--tint);
+}
+.render-controls select {
+  max-width: 180px;
+  font-size: 10px;
+  padding: 5px;
+}
+.floor-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.floor-options button {
+  border: 1px solid var(--line);
+  padding: 8px 5px;
+  flex-direction: column;
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: center;
+}
+.floor-options button.active {
+  border-color: var(--green);
+  background: var(--tint);
+}
+.floor-options span {
+  width: 100%;
+  height: 30px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px #0001;
+}
+.floor-finishes small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 10px 0 20px;
+}
+.toast {
+  pointer-events: none;
+}
+.toast button {
+  pointer-events: auto;
+}
