@@ -36,6 +36,26 @@ describe("Placement, échelle et empreintes", () => {
     expect(placed.guides).toHaveLength(1);
     expect(edgeWallDistance(placed.item, p.walls[0])).toBeCloseTo(0);
   });
+  it("annonce zéro dégagement quand un mur est contenu dans un meuble trop grand", () => {
+    const item = {
+      ...furniture(catalog[0]),
+      x: 0,
+      y: 0,
+      width: 10,
+      depth: 10,
+      rotation: 30,
+    };
+    const wall = {
+      id: "inside",
+      a: { x: 0, y: 0 },
+      b: { x: 1, y: 0 },
+      height: 2.6,
+      thickness: 0.2,
+      color: "#fff",
+      openings: [],
+    };
+    expect(edgeWallDistance(item, wall)).toBe(0);
+  });
   it("aligne les centres entre meubles proches", () => {
     const p = blank(),
       a = { ...furniture(catalog[0]), x: 3, y: 2 },

@@ -100,6 +100,20 @@ export function magneticPlacement(
   };
 }
 export function edgeWallDistance(item: Item, wall: Wall) {
+  const angle = (-item.rotation * Math.PI) / 180,
+    c = Math.cos(angle),
+    s = Math.sin(angle);
+  if (
+    [wall.a, wall.b].some((q) => {
+      const x = q.x - item.x,
+        y = q.y - item.y;
+      return (
+        Math.abs(x * c - y * s) <= item.width / 2 &&
+        Math.abs(x * s + y * c) <= item.depth / 2
+      );
+    })
+  )
+    return 0;
   const pts = corners(item);
   let min = Infinity;
   for (let k = 0; k < pts.length; k++) {
