@@ -585,8 +585,10 @@ export default function Scene({
   fieldOfView = 72,
   walkSpeed = 1.4,
   realistic = false,
+  paused = false,
 }: {
   realistic?: boolean;
+  paused?: boolean;
   eyeHeight?: number;
   fieldOfView?: number;
   walkSpeed?: number;
@@ -664,6 +666,7 @@ export default function Scene({
   return (
     <Canvas
       shadows
+      frameloop={paused ? "never" : "always"}
       style={{ touchAction: "none", cursor: drag ? "grabbing" : "grab" }}
       dpr={[1, quality ? 2 : 1.25]}
       gl={{ preserveDrawingBuffer: true }}

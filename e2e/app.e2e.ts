@@ -184,7 +184,18 @@ test("plan PDF, calibration et restauration ZIP avec un modèle GLB", async ({
   await page
     .getByRole("button", { name: "Utiliser comme fond de plan" })
     .click();
-  await expect(page.locator(".plan-svg image")).toBeVisible({ timeout: 20000 });
+  await expect
+    .poll(
+      async () => {
+        const error = (
+          await page.locator(".auto-import [role=alert]").allTextContents()
+        ).join(" ");
+        if (error) throw Error("Import PDF : " + error);
+        return page.locator(".plan-svg image").count();
+      },
+      { timeout: 20000 },
+    )
+    .toBe(1);
   const svg = page.locator(".plan-svg"),
     box = await svg.boundingBox();
   if (!box) throw Error("Plan absent");

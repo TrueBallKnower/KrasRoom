@@ -813,6 +813,7 @@ export default function App() {
                     hide={hide}
                     quality={quality}
                     realistic={realistic}
+                    paused={!!modal || busy}
                     onError={notify}
                   />
                 </Suspense>
