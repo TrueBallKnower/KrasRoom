@@ -1872,3 +1872,53 @@ button:focus-visible {
   line-height: 1.6;
   color: var(--muted);
 }
+.camera-toolbar-content {
+  display: grid;
+  gap: 7px;
+}
+.camera-toolbar-toggle,
+.inspector-close {
+  display: none;
+}
+@media (max-width: 800px) {
+  .camera-toolbar {
+    top: 96px;
+    bottom: auto;
+    max-width: 180px;
+  }
+  .camera-toolbar-toggle {
+    display: flex;
+    padding: 9px 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    font-size: 11px;
+    box-shadow: 0 3px 12px #1524370a;
+  }
+  .camera-toolbar-content {
+    display: none;
+  }
+  .camera-toolbar-content[data-expanded="true"] {
+    display: grid;
+  }
+  .inspector-close {
+    display: flex;
+    position: absolute;
+    right: 7px;
+    top: 7px;
+    padding: 5px;
+  }
+}
+@media (max-width: 520px) {
+  header {
+    padding: 0 8px;
+    gap: 8px;
+  }
+  .brand {
+    font-size: 18px;
+    gap: 6px;
+  }
+  .brand-mark {
+    width: 27px;
+    height: 27px;
+  }
+}

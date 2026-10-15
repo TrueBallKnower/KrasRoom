@@ -1046,6 +1046,13 @@ export default function App() {
                     : "Les détails font la différence"}
             </h3>
             <span className="section-label">PROPRIÉTÉS</span>
+            <button
+              className="inspector-close"
+              aria-label="Fermer les propriétés"
+              onClick={() => select(null)}
+            >
+              <X size={17} />
+            </button>
           </div>
           {item ? (
             <>
