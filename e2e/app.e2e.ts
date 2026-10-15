@@ -408,3 +408,85 @@ test("un PDF vectoriel et la surface suffisent aussi à générer la 3D", async 
   await expect(page.locator("footer")).toContainText("60.0 m²");
   await expect(page.locator("canvas")).toBeVisible();
 });
+
+test("placement et déplacement directs dans la vue 3D, rotation et visite réglable", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Appartement · 48/ }).click();
+  await page
+    .getByRole("button", { name: "Nouvel appartement", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  if (!box) throw Error("Canvas absent");
+  const transfer = await page.evaluateHandle(() => {
+    const d = new DataTransfer();
+    d.setData(
+      "roomora-item",
+      JSON.stringify({
+        id: "test",
+        name: "Table test",
+        kind: "table",
+        x: 0,
+        y: 0,
+        width: 1.6,
+        depth: 0.9,
+        height: 0.75,
+        rotation: 0,
+        color: "#ba9470",
+      }),
+    );
+    return d;
+  });
+  await canvas.dispatchEvent("drop", {
+    dataTransfer: transfer,
+    clientX: box.x + box.width / 2,
+    clientY: box.y + box.height / 2,
+  });
+  await expect(page.getByLabel("Nom", { exact: true })).toHaveValue(
+    "Table test",
+  );
+  const before = await page
+    .getByLabel("Position X", { exact: true })
+    .inputValue();
+  // Project the tabletop center with the documented empty-project orbit camera.
+  const { PerspectiveCamera, Vector3 } = await import("three");
+  const camera = new PerspectiveCamera(42, box.width / box.height, 0.05, 500);
+  camera.position.set(11.2, 7.6, 11.8);
+  camera.lookAt(4, 0, 3);
+  camera.updateMatrixWorld();
+  const q = new Vector3(
+    Number(before),
+    0.73,
+    Number(await page.getByLabel("Position Y", { exact: true }).inputValue()),
+  ).project(camera);
+  const x = box.x + ((q.x + 1) * box.width) / 2,
+    y = box.y + ((1 - q.y) * box.height) / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 65, y + 15, { steps: 12 });
+  await page.mouse.up();
+  await expect(page.getByLabel("Position X", { exact: true })).not.toHaveValue(
+    before,
+  );
+  await page
+    .getByTitle("Tourner de 15° vers la droite", { exact: true })
+    .click();
+  await expect(page.getByLabel("Rotation", { exact: true })).toHaveValue("15");
+  await page.getByTitle("Annuler · ⌘Z").click();
+  await expect(page.getByLabel("Rotation", { exact: true })).toHaveValue("0");
+  await page.getByRole("button", { name: "Visite", exact: true }).click();
+  await page
+    .getByLabel("Hauteur des yeux", { exact: true })
+    .selectOption("1.4");
+  await expect(page.getByLabel("Champ de vision", { exact: true })).toHaveValue(
+    "72",
+  );
+  await expect(
+    page.getByLabel("Vitesse de visite", { exact: true }),
+  ).toBeVisible();
+});

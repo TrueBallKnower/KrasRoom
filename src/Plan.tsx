@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { wallOutline } from "./spatial";
 import { assetGet } from "./db";
 import { useStore } from "./store";
 import {
@@ -83,12 +84,16 @@ export default function Plan({
     let out = { x: v.x, y: v.y };
     if (snap && tool !== "scale") {
       const endpoints = p.walls.flatMap((w) => [w.a, w.b]);
-      const nearest = endpoints.find((v) => distance(v, out) < 0.15 / zoom);
-      out = nearest || {
-        x: Math.round(out.x * 20) / 20,
-        y: Math.round(out.y * 20) / 20,
-      };
-      if (points.length && tool === "wall") {
+      const nearest = endpoints
+        .filter((v) => distance(v, out) < 0.18 / zoom)
+        .sort((a, b) => distance(a, out) - distance(b, out))[0];
+      out = nearest
+        ? { ...nearest }
+        : {
+            x: Math.round(out.x * 20) / 20,
+            y: Math.round(out.y * 20) / 20,
+          };
+      if (!nearest && points.length && tool === "wall") {
         const a = points.at(-1)!;
         if (Math.abs(out.x - a.x) < 0.12) out.x = a.x;
         if (Math.abs(out.y - a.y) < 0.12) out.y = a.y;
@@ -351,14 +356,20 @@ export default function Plan({
               }
             }}
           >
+            <polygon
+              points={wallOutline(w, p.walls)
+                .map((q) => `${q.x},${q.y}`)
+                .join(" ")}
+              fill={selected === w.id ? "#397bea" : "#697068"}
+            />
             <line
               x1={w.a.x}
               y1={w.a.y}
               x2={w.b.x}
               y2={w.b.y}
-              stroke={selected === w.id ? "#397565" : "#697068"}
+              stroke="transparent"
               strokeWidth={w.thickness}
-              strokeLinecap="square"
+              strokeLinecap="butt"
             />
             {w.openings.map((o) => {
               const len = distance(w.a, w.b),

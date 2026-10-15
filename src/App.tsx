@@ -65,6 +65,7 @@ import {
 } from "./db";
 import { importPlan, importModel, importURL } from "./imports";
 import AssetImage from "./AssetImage";
+import { visitStart } from "./spatial";
 import FurniturePreview from "./FurniturePreview";
 import AutoPlanImport from "./AutoPlanImport";
 import Plan, { type Tool } from "./Plan";
@@ -122,6 +123,9 @@ export default function App() {
     [transparent, setTransparent] = useState(false),
     [ceiling, setCeiling] = useState(false),
     [quality, setQuality] = useState(false),
+    [eyeHeight, setEyeHeight] = useState(1.55),
+    [fieldOfView, setFieldOfView] = useState(72),
+    [walkSpeed, setWalkSpeed] = useState(1.4),
     [message, setMessage] = useState(""),
     [persisted, setPersisted] = useState<Project | null>(null),
     [saveError, setSaveError] = useState(false),
@@ -216,7 +220,11 @@ export default function App() {
   }
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).matches("input,textarea,select")) return;
+      if (
+        document.pointerLockElement ||
+        (e.target as HTMLElement).matches("input,textarea,select")
+      )
+        return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         e.shiftKey ? redo() : undo();
@@ -260,7 +268,8 @@ export default function App() {
   }
   function add(i: Item) {
     const id = uid();
-    change((p) => p.items.push({ ...i, id }));
+    const position = view === "3d" ? visitStart(p) : { x: i.x, y: i.y };
+    change((p) => p.items.push({ ...i, ...position, id }));
     select(id);
   }
   async function openProjects() {
@@ -544,6 +553,13 @@ export default function App() {
                         <div className="personal-card" key={i.id}>
                           <button
                             className="furniture-card"
+                            draggable
+                            onDragStart={(e) =>
+                              e.dataTransfer.setData(
+                                "roomora-item",
+                                JSON.stringify(i),
+                              )
+                            }
                             onClick={() => add(i)}
                           >
                             <div className="furniture-preview">
@@ -759,6 +775,9 @@ export default function App() {
                   <Scene
                     key={view}
                     walk={view === "walk"}
+                    eyeHeight={eyeHeight}
+                    fieldOfView={fieldOfView}
+                    walkSpeed={walkSpeed}
                     snap={snap}
                     transparent={transparent}
                     ceiling={ceiling}
@@ -767,11 +786,109 @@ export default function App() {
                     onError={notify}
                   />
                 </Suspense>
+                {view === "3d" && item && (
+                  <div
+                    className="object-actions"
+                    aria-label="Actions du meuble en 3D"
+                  >
+                    <strong>{item.name}</strong>
+                    <button
+                      title="Tourner de 15° vers la gauche"
+                      onClick={() =>
+                        editItem("rotation", (item.rotation - 15) % 360)
+                      }
+                    >
+                      <Undo2 size={16} />
+                    </button>
+                    <button
+                      title="Tourner de 15° vers la droite"
+                      onClick={() =>
+                        editItem("rotation", (item.rotation + 15) % 360)
+                      }
+                    >
+                      <Redo2 size={16} />
+                    </button>
+                    <button
+                      title="Dupliquer le meuble sélectionné"
+                      onClick={duplicate}
+                    >
+                      <Copy size={16} />
+                    </button>
+                    <button
+                      title="Aligner le meuble contre un mur"
+                      onClick={() =>
+                        change((p) => {
+                          const index = p.items.findIndex(
+                            (i) => i.id === item.id,
+                          );
+                          p.items[index] = againstWall(p.items[index], p.walls);
+                        })
+                      }
+                    >
+                      <Magnet size={16} />
+                    </button>
+                    <button
+                      title="Supprimer le meuble sélectionné"
+                      onClick={remove}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <small>
+                      Glissez le meuble pour le déplacer · R pour tourner
+                    </small>
+                  </div>
+                )}
                 <div className="canvas-hint">
                   {view === "walk"
                     ? "Cliquez pour visiter · ZQSD / WASD pour avancer · Échap pour libérer la souris"
-                    : "Glissez pour tourner · Molette pour zoomer · Glissez un meuble pour le déplacer"}
+                    : "Glissez un meuble du catalogue dans la pièce · Glissez le fond pour tourner · Molette pour zoomer"}
                 </div>
+                {view === "walk" && (
+                  <div className="visit-settings">
+                    <strong>Confort de visite</strong>
+                    <label>
+                      Hauteur des yeux{" "}
+                      <select
+                        aria-label="Hauteur des yeux"
+                        value={eyeHeight}
+                        onChange={(e) => setEyeHeight(Number(e.target.value))}
+                      >
+                        <option value={1.4}>1,40 m</option>
+                        <option value={1.55}>1,55 m</option>
+                        <option value={1.65}>1,65 m</option>
+                        <option value={1.75}>1,75 m</option>
+                      </select>
+                    </label>
+                    <label>
+                      Champ de vision{" "}
+                      <input
+                        aria-label="Champ de vision"
+                        type="range"
+                        min="55"
+                        max="90"
+                        value={fieldOfView}
+                        onChange={(e) => setFieldOfView(Number(e.target.value))}
+                      />
+                      <span>{fieldOfView}°</span>
+                    </label>
+                    <label>
+                      Déplacement{" "}
+                      <select
+                        aria-label="Vitesse de visite"
+                        value={walkSpeed}
+                        onChange={(e) => setWalkSpeed(Number(e.target.value))}
+                      >
+                        <option value={0.8}>Lent</option>
+                        <option value={1.4}>Normal</option>
+                        <option value={2.2}>Rapide</option>
+                      </select>
+                    </label>
+                    <small>
+                      La perspective change, les dimensions restent en mètres.
+                      Échap pour régler la visite.
+                    </small>
+                  </div>
+                )}
                 <div className="render-controls">
                   <label>
                     <input

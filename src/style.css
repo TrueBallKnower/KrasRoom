@@ -1600,3 +1600,89 @@ button:focus-visible {
 [data-theme="dark"] .plan-svg {
   background-color: #17202c;
 }
+.visit-settings {
+  position: absolute;
+  z-index: 2;
+  right: 18px;
+  top: 82px;
+  width: 215px;
+  padding: 15px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 5px 22px #15243712;
+  display: grid;
+  gap: 12px;
+  font-size: 11px;
+}
+.visit-settings label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+.visit-settings select {
+  padding: 5px;
+  font-size: 11px;
+}
+.visit-settings input {
+  width: 80px;
+  accent-color: var(--green);
+}
+.visit-settings small {
+  color: var(--muted);
+  line-height: 1.6;
+}
+@media (max-width: 800px) {
+  .visit-settings {
+    top: auto;
+    bottom: 125px;
+    right: 8px;
+    width: 180px;
+    padding: 10px;
+    gap: 8px;
+  }
+}
+.object-actions {
+  position: absolute;
+  z-index: 3;
+  bottom: 105px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 9px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 6px 25px #15243722;
+  max-width: calc(100% - 24px);
+  width: max-content;
+  font-size: 11px;
+}
+.object-actions strong {
+  padding: 0 9px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.object-actions button {
+  padding: 8px;
+}
+.object-actions small {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 10px;
+  color: var(--muted);
+  padding-top: 3px;
+}
+.furniture-card[draggable="true"] {
+  cursor: grab;
+}
+.furniture-card[draggable="true"]:active {
+  cursor: grabbing;
+}

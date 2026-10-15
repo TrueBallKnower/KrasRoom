@@ -16,3 +16,19 @@ it("annule et rétablit une commande, et invalide la branche après une nouvelle
   expect(useStore.getState().future).toHaveLength(0);
   expect(useStore.getState().project.name).toBe("Nouveau");
 });
+it("conserve la sélection pendant une édition annulée et la retire si le meuble disparaît", () => {
+  const i = furniture(catalog[0]);
+  useStore.getState().set(blank());
+  useStore.getState().change((p) => p.items.push(i));
+  useStore.getState().select(i.id);
+  useStore.getState().change((p) => {
+    p.items[0].rotation = 15;
+  });
+  useStore.getState().undo();
+  expect(useStore.getState().selected).toBe(i.id);
+  useStore.getState().redo();
+  expect(useStore.getState().selected).toBe(i.id);
+  useStore.getState().undo();
+  useStore.getState().undo();
+  expect(useStore.getState().selected).toBeNull();
+});

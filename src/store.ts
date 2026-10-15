@@ -32,7 +32,13 @@ export const useStore = create<State>((set, get) => ({
         project: s.past.at(-1)!,
         past: s.past.slice(0, -1),
         future: [s.project, ...s.future],
-        selected: null,
+        selected: [
+          ...s.past.at(-1)!.items,
+          ...s.past.at(-1)!.walls,
+          ...s.past.at(-1)!.rooms,
+        ].some((v) => v.id === s.selected)
+          ? s.selected
+          : null,
       });
   },
   redo: () => {
@@ -42,7 +48,13 @@ export const useStore = create<State>((set, get) => ({
         project: s.future[0],
         future: s.future.slice(1),
         past: [...s.past, s.project],
-        selected: null,
+        selected: [
+          ...s.future[0].items,
+          ...s.future[0].walls,
+          ...s.future[0].rooms,
+        ].some((v) => v.id === s.selected)
+          ? s.selected
+          : null,
       });
   },
 }));

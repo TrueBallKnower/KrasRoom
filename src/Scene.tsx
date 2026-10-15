@@ -1,5 +1,10 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useState, useRef } from "react";
+import {
+  Canvas,
+  useThree,
+  useFrame,
+  type ThreeEvent,
+} from "@react-three/fiber";
 import {
   OrbitControls,
   PointerLockControls,
@@ -16,6 +21,7 @@ import {
   Vector2,
   type Group,
 } from "three";
+import { wallOutline, visitStart } from "./spatial";
 import { assetGet } from "./db";
 import { parseModel } from "./imports";
 import { useStore } from "./store";
@@ -226,7 +232,16 @@ function Model({ i, onError }: { i: Item; onError: (s: string) => void }) {
     />
   );
 }
-function WallMesh({ w, transparent }: { w: Wall; transparent: boolean }) {
+function WallMesh({
+  w,
+  walls,
+  transparent,
+}: {
+  w: Wall;
+  walls: Wall[];
+  transparent: boolean;
+}) {
+  const outline = wallOutline(w, walls);
   const length = distance(w.a, w.b),
     angle = Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x),
     parts: React.ReactNode[] = [];
@@ -242,11 +257,38 @@ function WallMesh({ w, transparent }: { w: Wall; transparent: boolean }) {
     parts.push(
       <mesh
         key={key}
-        position={[(start + end) / 2, (bottom + top) / 2, 0]}
+        position={[0, bottom, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
         castShadow
         receiveShadow
       >
-        <boxGeometry args={[end - start, top - bottom, w.thickness]} />
+        <extrudeGeometry
+          args={[
+            (() => {
+              const local = outline.map((q) => ({
+                x:
+                  (q.x - w.a.x) * Math.cos(angle) +
+                  (q.y - w.a.y) * Math.sin(angle),
+                z:
+                  -(q.x - w.a.x) * Math.sin(angle) +
+                  (q.y - w.a.y) * Math.cos(angle),
+              }));
+              const pts = [
+                start === 0 ? local[0] : { x: start, z: w.thickness / 2 },
+                end === length ? local[1] : { x: end, z: w.thickness / 2 },
+                end === length ? local[2] : { x: end, z: -w.thickness / 2 },
+                start === 0 ? local[3] : { x: start, z: -w.thickness / 2 },
+              ];
+              const shape = new Shape();
+              pts.forEach((p, i) =>
+                i ? shape.lineTo(p.x, -p.z) : shape.moveTo(p.x, -p.z),
+              );
+              shape.closePath();
+              return shape;
+            })(),
+            { depth: top - bottom, bevelEnabled: false },
+          ]}
+        />
         <meshStandardMaterial
           color={w.color}
           transparent={transparent}
@@ -301,51 +343,75 @@ function Floor({ r, ceiling }: { r: Room; ceiling?: boolean }) {
     </mesh>
   );
 }
-function Walk() {
+function Walk({
+  eyeHeight,
+  fieldOfView,
+  speed,
+}: {
+  eyeHeight: number;
+  fieldOfView: number;
+  speed: number;
+}) {
   const { camera } = useThree();
+  const p = useStore((s) => s.project);
+  const start = useMemo(() => visitStart(p), [p.id]);
+  const keys = useRef(new Set<string>());
+  const velocity = useRef(new Vector3());
   useEffect(() => {
-    camera.position.set(2, 1.65, 4);
-  }, [camera]);
+    camera.position.set(start.x, eyeHeight, start.y);
+    camera.lookAt(start.x + 1, eyeHeight, start.y);
+  }, [camera, start]);
   useEffect(() => {
-    const keys = new Set<string>();
-    const down = (e: KeyboardEvent) => keys.add(e.code),
-      up = (e: KeyboardEvent) => keys.delete(e.code);
+    if ("fov" in camera) {
+      (camera as import("three").PerspectiveCamera).fov = fieldOfView;
+      camera.updateProjectionMatrix();
+    }
+    camera.position.y = eyeHeight;
+  }, [camera, fieldOfView, eyeHeight]);
+  useEffect(() => {
+    const clear = () => {
+      keys.current.clear();
+      velocity.current.set(0, 0, 0);
+    };
+    const down = (e: KeyboardEvent) => {
+      if (document.pointerLockElement) {
+        e.preventDefault();
+        keys.current.add(e.code);
+      }
+    };
+    const up = (e: KeyboardEvent) => keys.current.delete(e.code);
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
-    let frame: number,
-      last = performance.now();
-    const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      const forward = new Vector3();
-      camera.getWorldDirection(forward);
-      forward.y = 0;
-      forward.normalize();
-      const right = forward.clone().cross(new Vector3(0, 1, 0));
-      if (!document.pointerLockElement) {
-        keys.clear();
-        frame = requestAnimationFrame(tick);
-        return;
-      }
-      if (keys.has("KeyW") || keys.has("KeyZ") || keys.has("ArrowUp"))
-        camera.position.addScaledVector(forward, dt * 2);
-      if (keys.has("KeyS") || keys.has("ArrowDown"))
-        camera.position.addScaledVector(forward, -dt * 2);
-      if (keys.has("KeyD") || keys.has("ArrowRight"))
-        camera.position.addScaledVector(right, dt * 2);
-      if (keys.has("KeyA") || keys.has("KeyQ") || keys.has("ArrowLeft"))
-        camera.position.addScaledVector(right, -dt * 2);
-      camera.position.y = 1.65;
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
+    window.addEventListener("blur", clear);
+    document.addEventListener("pointerlockchange", clear);
     return () => {
-      cancelAnimationFrame(frame);
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", clear);
+      document.removeEventListener("pointerlockchange", clear);
     };
-  }, [camera]);
-  return <PointerLockControls />;
+  }, []);
+  useFrame((_, delta) => {
+    if (!document.pointerLockElement) return;
+    const dt = Math.min(delta, 0.05),
+      k = keys.current;
+    const forward = camera.getWorldDirection(new Vector3());
+    forward.y = 0;
+    forward.normalize();
+    const right = forward.clone().cross(new Vector3(0, 1, 0));
+    const direction = new Vector3();
+    if (k.has("KeyW") || k.has("KeyZ") || k.has("ArrowUp"))
+      direction.add(forward);
+    if (k.has("KeyS") || k.has("ArrowDown")) direction.sub(forward);
+    if (k.has("KeyD") || k.has("ArrowRight")) direction.add(right);
+    if (k.has("KeyA") || k.has("KeyQ") || k.has("ArrowLeft"))
+      direction.sub(right);
+    direction.normalize().multiplyScalar(speed);
+    velocity.current.lerp(direction, 1 - Math.exp(-12 * dt));
+    camera.position.addScaledVector(velocity.current, dt);
+    camera.position.y = eyeHeight;
+  });
+  return <PointerLockControls pointerSpeed={0.65} />;
 }
 function FitCamera({
   id,
@@ -420,7 +486,13 @@ export default function Scene({
   quality,
   snap,
   onError,
+  eyeHeight = 1.55,
+  fieldOfView = 72,
+  walkSpeed = 1.4,
 }: {
+  eyeHeight?: number;
+  fieldOfView?: number;
+  walkSpeed?: number;
   walk: boolean;
   transparent: boolean;
   ceiling: boolean;
@@ -452,6 +524,18 @@ export default function Scene({
     dx: number;
     dy: number;
   } | null>(null);
+  const orbit = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+  useEffect(() => {
+    if (!drag) return;
+    const cancel = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDrag(null);
+        if (orbit.current) orbit.current.enabled = true;
+      }
+    };
+    window.addEventListener("keydown", cancel);
+    return () => window.removeEventListener("keydown", cancel);
+  }, [drag]);
   const ground = useMemo(() => new Plane(new Vector3(0, 1, 0), 0), []);
   function move(e: ThreeEvent<PointerEvent>) {
     if (!drag) return;
@@ -472,14 +556,21 @@ export default function Scene({
       }
     });
     setDrag(null);
+    if (orbit.current) orbit.current.enabled = true;
     (e.target as Element).releasePointerCapture(e.pointerId);
   }
   return (
     <Canvas
       shadows
+      style={{ touchAction: "none", cursor: drag ? "grabbing" : "grab" }}
       dpr={[1, quality ? 2 : 1.25]}
       gl={{ preserveDrawingBuffer: true }}
-      camera={{ position: [11, 10, 13], fov: 42 }}
+      camera={{
+        position: [11, 10, 13],
+        fov: walk ? fieldOfView : 42,
+        near: 0.05,
+        far: 500,
+      }}
       onPointerMissed={() => select(null)}
     >
       <FitCamera id={p.id} {...bounds} walk={walk} />
@@ -513,7 +604,12 @@ export default function Scene({
         </group>
       ))}
       {p.walls.map((w) => (
-        <WallMesh key={w.id} w={w} transparent={transparent} />
+        <WallMesh
+          key={w.id}
+          w={w}
+          walls={p.walls}
+          transparent={transparent && !walk}
+        />
       ))}
       {!hide &&
         p.items.map((i) => (
@@ -535,6 +631,7 @@ export default function Scene({
               if (walk) return;
               e.stopPropagation();
               select(i.id);
+              if (orbit.current) orbit.current.enabled = false;
               const q = e.ray.intersectPlane(ground, new Vector3());
               if (q)
                 setDrag({
@@ -550,11 +647,22 @@ export default function Scene({
             <Suspense fallback={null}>
               {i.asset ? <Model i={i} onError={onError} /> : <BuiltIn i={i} />}
             </Suspense>
-            {(selected === i.id || collides(i, p)) && (
+            {(selected === i.id ||
+              collides(
+                drag?.id === i.id ? { ...i, x: drag.x, y: drag.y } : i,
+                p,
+              )) && (
               <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
                 <planeGeometry args={[i.width + 0.08, i.depth + 0.08]} />
                 <meshBasicMaterial
-                  color={collides(i, p) ? "#dc725e" : "#41796b"}
+                  color={
+                    collides(
+                      drag?.id === i.id ? { ...i, x: drag.x, y: drag.y } : i,
+                      p,
+                    )
+                      ? "#dc725e"
+                      : "#41796b"
+                  }
                   transparent
                   opacity={0.5}
                 />
@@ -572,10 +680,17 @@ export default function Scene({
         />
       )}{" "}
       {walk ? (
-        <Walk />
+        <Walk
+          eyeHeight={eyeHeight}
+          fieldOfView={fieldOfView}
+          speed={walkSpeed}
+        />
       ) : (
         <OrbitControls
+          ref={orbit}
           makeDefault
+          enableDamping
+          dampingFactor={0.1}
           enabled={!drag}
           target={[bounds.x, 0, bounds.y]}
           maxPolarAngle={Math.PI / 2 - 0.03}
