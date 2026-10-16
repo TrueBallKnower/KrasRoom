@@ -76,6 +76,14 @@ test("un téléphone refusant les Blobs IndexedDB récupère réellement les fic
       ),
     });
     await expect(laptop.locator("footer")).toContainText("1 meubles");
+    const sourceDownload = laptop.waitForEvent("download");
+    await laptop.getByRole("button", { name: "Exporter", exact: true }).click();
+    const sourceStream = await (await sourceDownload).createReadStream();
+    const sourceParts: Buffer[] = [];
+    for await (const part of sourceStream!) sourceParts.push(part);
+    const sourceFiles = unzipSync(Buffer.concat(sourceParts));
+    const sourceProject = JSON.parse(strFromU8(sourceFiles["project.json"]));
+    expect(Buffer.compare(Buffer.from(sourceFiles["assets/" + sourceProject.items[0].asset]), Buffer.from(model)), "Import et stockage source intacts").toBe(0);
     await laptop.getByRole("button", { name: /Mon compte/ }).click();
     await laptop
       .getByRole("button", {
@@ -90,7 +98,7 @@ test("un téléphone refusant les Blobs IndexedDB récupère réellement les fic
       ),
     ).toBeVisible();
     for (const bytes of service.files.values())
-      expect(Buffer.compare(bytes, Buffer.from(model)), "Le service reçoit le modèle intact").toBe(0);
+      expect({size: bytes.length, expectedSize: model.length, firstDifference: bytes.findIndex((v,i) => v !== model[i]), head: bytes.subarray(0,100).toString(), tail: bytes.subarray(-100).toString()}, "Le service reçoit le modèle intact").toEqual({size: model.length, expectedSize: model.length, firstDifference: -1, head: Buffer.from(model).subarray(0,100).toString(), tail: Buffer.from(model).subarray(-100).toString()});
     await login(phone);
     try {
       await expect(phone.locator("footer")).toContainText("1 meubles", {
