@@ -463,7 +463,7 @@ export default function App() {
             Mon compte
             {cloud.session
               ? cloud.busy
-                ? " · Envoi…"
+                ? " · Synchro…"
                 : cloud.error
                   ? " · À vérifier"
                   : " · Connecté"

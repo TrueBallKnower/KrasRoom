@@ -1,5 +1,9 @@
 import "fake-indexeddb/auto";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { refreshCloudProject } from "./cloudRefresh";
+import { useStore } from "./store";
+import { useCloud } from "./cloudState";
+import type { Session } from "@supabase/supabase-js";
 import { demo, uid } from "./model";
 import { assetPut, assetGet, saveProject, projects } from "./db";
 import {
@@ -20,6 +24,7 @@ const mock = vi.hoisted(() => ({
   uploads: 0,
   fail: false,
   race: false,
+  onDownload: undefined as (() => void) | undefined,
 }));
 vi.mock("./cloudClient", () => ({
   cloudClient: async () => ({
@@ -33,10 +38,13 @@ vi.mock("./cloudClient", () => ({
           mock.files.set(path, b);
           return { error: null };
         },
-        download: async (path: string) => ({
-          data: mock.files.get(path),
-          error: mock.files.has(path) ? null : { message: "missing" },
-        }),
+        download: async (path: string) => {
+          mock.onDownload?.();
+          return {
+            data: mock.files.get(path),
+            error: mock.files.has(path) ? null : { message: "missing" },
+          };
+        },
       }),
     },
     from: () => {
@@ -63,6 +71,12 @@ vi.mock("./cloudClient", () => ({
       };
       const q: any = {
         select: () => q,
+        order: async () => ({
+          data: [...mock.rows.values()]
+            .reverse()
+            .map((r) => structuredClone(r)),
+          error: null,
+        }),
         eq: (k: string, v: string) => {
           filters[k] = v;
           return q;
@@ -92,6 +106,8 @@ beforeEach(() => {
   mock.uploads = 0;
   mock.fail = false;
   mock.race = false;
+  mock.onDownload = undefined;
+  useCloud.getState().patch({ session: null, busy: false, error: "", tick: 0 });
 });
 describe("Sauvegarde entre appareils (service simulé)", () => {
   it("transfère les octets, les vérifie et réutilise les fichiers après modification d’un meuble", async () => {
@@ -214,5 +230,89 @@ describe("Sauvegarde entre appareils (service simulé)", () => {
     d.assets[id].size = 2;
     expect(() => validateCloudDocument(d, user, p.id)).toThrow("incomplète");
     expect(await fingerprint(p)).toBe(await fingerprint(structuredClone(p)));
+  });
+});
+
+describe("Reprise automatique entre appareils", () => {
+  function login(user: string) {
+    useCloud.getState().patch({ session: { user: { id: user } } as Session });
+  }
+  it("reprend le dernier appartement à la connexion tout en conservant le projet local", async () => {
+    const user = uid(),
+      remote = demo(),
+      local = demo();
+    remote.name = "Appartement du laptop";
+    local.name = "Travail sur PC";
+    await saveCloudProject(remote, user);
+    useStore.getState().set(local);
+    login(user);
+    await refreshCloudProject(user, true);
+    expect(useStore.getState().project.id).toBe(remote.id);
+    expect((await projects()).find((p) => p.id === local.id)?.name).toBe(
+      local.name,
+    );
+  });
+  it("récupère une nouvelle révision avec tous les meubles et fichiers sur un appareil sans modifications", async () => {
+    const user = uid(),
+      p = demo();
+    await saveCloudProject(p, user);
+    useStore.getState().set(p);
+    login(user);
+    const row = mock.rows.get(p.id),
+      changed = structuredClone(p);
+    changed.items.push({
+      ...changed.items[0],
+      id: uid(),
+      name: "Nouveau canapé",
+      asset: await assetPut(new Blob(["canape"])),
+    });
+    await saveCloudProject(changed, user);
+    // Restore the old device's link, rather than the sender's new revision.
+    const { putCloudLink } = await import("./cloudMeta");
+    await putCloudLink(user, p.id, {
+      revision: row.revision,
+      fingerprint: await fingerprint(p),
+    });
+    await refreshCloudProject(user, false);
+    const loaded = useStore.getState().project;
+    expect(loaded.items).toHaveLength(changed.items.length);
+    expect(await (await assetGet(loaded.items.at(-1)!.asset!))!.text()).toBe(
+      "canape",
+    );
+    expect(useCloud.getState().busy).toBe(false);
+  });
+  it("suspend la récupération si les deux versions ont été modifiées", async () => {
+    const user = uid(),
+      p = demo();
+    await saveCloudProject(p, user);
+    mock.rows.get(p.id).revision = uid();
+    p.name = "Modification locale";
+    useStore.getState().set(p);
+    login(user);
+    await expect(refreshCloudProject(user, false)).rejects.toThrow(
+      "deux ordinateurs",
+    );
+    expect(useStore.getState().project).toBe(p);
+    expect(useCloud.getState().busy).toBe(false);
+  });
+  it("n’applique pas un téléchargement si l’utilisateur modifie le projet pendant sa réception", async () => {
+    const user = uid(),
+      remote = demo(),
+      local = demo();
+    remote.items[0].asset = await assetPut(new Blob(["modele"]));
+    await saveCloudProject(remote, user);
+    useStore.getState().set(local);
+    login(user);
+    mock.onDownload = () =>
+      useStore.getState().change((p) => {
+        p.name = "Modification pendant le téléchargement";
+      });
+    await expect(refreshCloudProject(user, true)).rejects.toThrow(
+      "pendant sa récupération",
+    );
+    expect(useStore.getState().project.name).toBe(
+      "Modification pendant le téléchargement",
+    );
+    expect(useCloud.getState().busy).toBe(false);
   });
 });

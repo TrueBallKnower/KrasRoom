@@ -36,3 +36,7 @@ Le stockage gratuit a un quota partagé entre utilisateurs (consulter les limite
 Les ressources retirées d'un appartement restent dans le bucket, car elles peuvent être réutilisées par d'autres appartements. Surveiller le quota dans le tableau de bord. Il n'y a pas encore de purge automatique des fragments orphelins, de partage entre utilisateurs ni de fusion collaborative des modifications. Conserver des exports ZIP locaux.
 
 Avant de considérer le service actif, vérifier avec un vrai projet Supabase : inscription et confirmation d'adresse ; connexion depuis deux navigateurs indépendants ; sauvegarde avec un GLB ; récupération des mêmes dimensions et octets ; conflit entre deux versions ; impossibilité pour un second compte de lire les lignes et les fichiers du premier. Les tests locaux avec réponses simulées ne remplacent pas cette vérification du service et des politiques RLS.
+
+### Reprise automatique entre ordinateurs
+
+Après le premier envoi explicite, les modifications sont envoyées automatiquement après quatre secondes sans changement. À la connexion, un appareil sans appartement lié reprend le dernier appartement en ligne en conservant son projet local. Un appartement déjà lié se met à jour au lancement et au retour dans l’onglet. Si les deux appareils ont des modifications non synchronisées, la mise à jour est suspendue et « Mon compte » permet de choisir une version ou de créer une copie. Garder l’onglet ouvert jusqu’à la fin de l’envoi ; ce mécanisme utilise l’offre gratuite existante et ses quotas, sans abonnement supplémentaire.

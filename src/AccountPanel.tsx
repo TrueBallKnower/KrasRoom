@@ -109,7 +109,9 @@ export default function AccountPanel({
           <p className="small">
             La sauvegarde locale reste active. Après le premier envoi, les
             modifications de cet appartement sont synchronisées automatiquement.
-            Sur l’autre ordinateur, connectez-vous puis ouvrez-le ci-dessous.
+            Sur l’autre ordinateur, la dernière version est récupérée à la
+            connexion et au retour dans l’onglet, si aucune modification locale
+            n’est en conflit.
           </p>
           <button
             className="primary full"

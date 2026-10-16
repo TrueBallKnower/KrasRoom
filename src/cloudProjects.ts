@@ -139,6 +139,7 @@ export async function openCloudProject(
   id: string,
   user: string,
   report: (s: string) => void = () => {},
+  canApply: () => boolean = () => true,
 ) {
   const c = await cloudClient(),
     { data, error } = await c
@@ -179,6 +180,10 @@ export async function openCloudProject(
     if (i.asset) i.asset = remap.get(i.asset)!;
     if (i.photo) i.photo = remap.get(i.photo)!;
   }
+  if (!canApply())
+    throw Error(
+      "Vous avez modifié l’appartement pendant sa récupération. Votre travail local est conservé ; réessayez après la sauvegarde.",
+    );
   // Never silently overwrite edits that only exist on this device.
   const local = (await projects()).find((p) => p.id === id),
     link = await cloudLink(user, id);

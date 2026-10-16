@@ -1,12 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { cloudConfig } from "./cloudConfig";
 import { cloudClient, cloudError } from "./cloudClient";
 import { useCloud } from "./cloudState";
 import { cloudLink } from "./cloudMeta";
 import { fingerprint } from "./cloudDocument";
 import { saveCloudProject } from "./cloudProjects";
-import { useStore } from "./store";
 import type { Project } from "./model";
+import { refreshCloudProject } from "./cloudRefresh";
+import { useStore } from "./store";
 export async function pushCloud(p: Project) {
   const state = useCloud.getState();
   if (!state.session || state.busy) return false;
@@ -25,11 +26,16 @@ export async function pushCloud(p: Project) {
       .patch({ error: cloudError(e), status: "Copie locale conservée" });
     return false;
   } finally {
-    useCloud.getState().patch({ busy: false });
+    const state = useCloud.getState();
+    state.patch({
+      busy: false,
+      ...(useStore.getState().project !== p ? { tick: state.tick + 1 } : {}),
+    });
   }
 }
 export function useCloudSync(project: Project, loaded: boolean) {
   const { session, tick } = useCloud();
+  const resumedUser = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!cloudConfig()) {
       useCloud.getState().patch({ ready: true });
@@ -89,34 +95,29 @@ export function useCloudSync(project: Project, loaded: boolean) {
     };
   }, [project, loaded, session?.user.id, tick]);
   useEffect(() => {
-    if (!session || !loaded) return;
+    if (!session) {
+      resumedUser.current = undefined;
+      return;
+    }
+    if (!loaded) return;
     const refresh = () => {
-      const p = useStore.getState().project;
       void (async () => {
-        const link = await cloudLink(session.user.id, p.id);
-        if (!link || useCloud.getState().busy) return;
-        const c = await cloudClient(),
-          { data, error } = await c
-            .from("roomora_projects")
-            .select("revision")
-            .eq("project_id", p.id)
-            .maybeSingle();
-        if (error) throw error;
-        if (!data || data.revision !== link.revision)
-          useCloud.getState().patch({
-            error:
-              "Une version différente existe en ligne. Ouvrez Mon compte pour la récupérer ; votre copie locale est conservée.",
-          });
-        else if ((await fingerprint(p)) !== link.fingerprint)
-          await pushCloud(p);
+        const user = session.user.id;
+        if (await refreshCloudProject(user, resumedUser.current !== user))
+          resumedUser.current = user;
       })().catch((e) => useCloud.getState().patch({ error: cloudError(e) }));
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") refresh();
     };
     window.addEventListener("online", refresh);
     window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", visible);
     refresh();
     return () => {
       window.removeEventListener("online", refresh);
       window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", visible);
     };
-  }, [session?.user.id, loaded, project.id]);
+  }, [session?.user.id, loaded, project.id, tick]);
 }

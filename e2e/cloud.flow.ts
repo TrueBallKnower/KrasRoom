@@ -212,7 +212,9 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
       id = first.project_id;
     await login(pb);
     await expect(pb.locator(".modal .project-list button")).toHaveCount(1);
-    await pb.locator(".modal .project-list button").click();
+    // A fresh device resumes the cloud apartment without clicking its row.
+    await expect(pb.locator("footer")).toContainText("6 meubles");
+    await pb.getByRole("button", { name: "Fermer", exact: true }).click();
     await expect(pb.getByRole("dialog")).toHaveCount(0);
     await expect(pb.locator("footer")).toContainText("6 meubles");
     await pb.locator('g[data-item="true"]').last().click({ force: true });
@@ -225,7 +227,48 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
       .poll(() => rows.get(owner + "/" + id).revision, { timeout: 15000 })
       .not.toBe(oldRevision);
     expect(uploads).toBe(1);
-    // Device A still has its earlier revision. Its save must be rejected.
+    // Returning to a clean device pulls the new revision automatically.
+    await pa.getByRole("button", { name: "Fermer", exact: true }).click();
+    await pa.getByRole("button", { name: "Plan 2D", exact: true }).click();
+    await pa.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(pa.locator(".account-button")).toHaveAttribute(
+      "title",
+      "À jour",
+    );
+    await expect
+      .poll(async () => pa.locator('g[data-item="true"]').count())
+      .toBe(6);
+    await pa.locator('g[data-item="true"]').last().click({ force: true });
+    await expect(pa.getByLabel("Position X", { exact: true })).toHaveValue(
+      "2.5",
+    );
+    // Session restoration also resumes the current cloud apartment after reload.
+    await pa.reload();
+    await expect(pa.locator("footer")).toContainText("6 meubles");
+    await pa.locator('g[data-item="true"]').last().click({ force: true });
+    await expect(pa.getByLabel("Position X", { exact: true })).toHaveValue(
+      "2.5",
+    );
+    // Both devices now edit: never silently overwrite the local version.
+    await pa.getByLabel("Position X", { exact: true }).fill("1.5");
+    const secondRevision = rows.get(owner + "/" + id).revision;
+    await pb.getByLabel("Position X", { exact: true }).fill("3.5");
+    await pb.getByRole("button", { name: /Mon compte/ }).click();
+    await pb
+      .getByRole("button", {
+        name: "Sauvegarder cet appartement en ligne",
+        exact: true,
+      })
+      .click();
+    await expect
+      .poll(() => rows.get(owner + "/" + id).revision)
+      .not.toBe(secondRevision);
+    await pb.getByRole("button", { name: "Fermer", exact: true }).click();
+    await pa.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(pa.getByLabel("Position X", { exact: true })).toHaveValue(
+      "1.5",
+    );
+    await pa.getByRole("button", { name: /Mon compte/ }).click();
     await pa
       .getByRole("button", {
         name: "Sauvegarder cet appartement en ligne",
@@ -253,7 +296,7 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
       item = project.items.find(
         (i: { name: string }) => i.name === "meuble-cloud",
       );
-    expect(item.x).toBe(2.5);
+    expect(item.x).toBe(3.5);
     expect(strFromU8(zip["assets/" + item.asset])).toContain(
       binary.toString("base64"),
     );
