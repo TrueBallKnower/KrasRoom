@@ -333,7 +333,7 @@ export function validateProject(v: unknown): asserts v is Project {
     !Array.isArray(p.walls) ||
     !Array.isArray(p.rooms)
   )
-    throw Error("Sauvegarde Roomora invalide.");
+    throw Error("Sauvegarde KrasRoom invalide.");
   const ids = new Set<string>();
   for (const object of [...p.items, ...p.walls, ...p.rooms]) {
     if (!object || !text(object.id) || ids.has(object.id))

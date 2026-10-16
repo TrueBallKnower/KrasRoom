@@ -68,7 +68,7 @@ describe("Meubles ZIP portables", () => {
       ),
     ).toThrow("Internet");
   });
-  it("distingue une sauvegarde Roomora et un ZIP ambigu", async () => {
+  it("distingue une sauvegarde KrasRoom et un ZIP ambigu", async () => {
     await expect(
       prepareFurnitureFile(
         new File(
@@ -80,7 +80,7 @@ describe("Meubles ZIP portables", () => {
           "backup.zip",
         ),
       ),
-    ).rejects.toThrow("sauvegarde Roomora");
+    ).rejects.toThrow("sauvegarde KrasRoom");
     await expect(
       prepareFurnitureFile(
         new File(

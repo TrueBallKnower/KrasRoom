@@ -1,10 +1,10 @@
-# Activer les comptes Roomora et la sauvegarde entre ordinateurs
+# Activer les comptes KrasRoom et la sauvegarde entre ordinateurs
 
 L'application locale fonctionne sans compte. Les comptes en ligne nécessitent un projet Supabase : GitHub Pages ne peut pas stocker les appartements des utilisateurs.
 
 ## Activation unique par le propriétaire du site
 
-1. Ouvrir <https://supabase.com/dashboard>, se connecter et choisir **New project**, avec le plan **Free**. Choisir une région proche des utilisateurs et conserver le mot de passe de la base dans un gestionnaire de mots de passe (il ne sera pas utilisé dans Roomora).
+1. Ouvrir <https://supabase.com/dashboard>, se connecter et choisir **New project**, avec le plan **Free**. Choisir une région proche des utilisateurs et conserver le mot de passe de la base dans un gestionnaire de mots de passe (il ne sera pas utilisé dans KrasRoom).
 2. Dans **SQL Editor → New query**, coller le contenu de [setup.sql](./setup.sql), puis cliquer **Run**. Cela crée la table privée et le stockage privé, avec des règles empêchant un utilisateur de consulter les appartements d'un autre.
 3. Dans **Authentication → URL Configuration**, mettre **Site URL** à `https://trueballknower.github.io/Roomora/`. Ajouter cette même URL aux **Redirect URLs**, ainsi que `http://localhost:5173/` pour les essais locaux.
 4. Dans **Authentication → Providers → Email**, garder les connexions par e-mail et la confirmation d'adresse activées. L'envoi d'e-mails fourni par défaut a un quota limité : consulter les limites affichées dans le tableau de bord avant d'ouvrir les inscriptions à beaucoup d'utilisateurs. Aucune carte bancaire n'est nécessaire pour l'offre gratuite.
@@ -12,7 +12,7 @@ L'application locale fonctionne sans compte. Les comptes en ligne nécessitent u
 6. Dans <https://github.com/TrueBallKnower/Roomora/settings/variables/actions>, choisir **New repository variable** et créer :
    - `VITE_SUPABASE_URL` : l'URL publique du projet.
    - `VITE_SUPABASE_ANON_KEY` : sa clé publique Publishable ou anon.
-7. Dans <https://github.com/TrueBallKnower/Roomora/actions>, ouvrir **Build, test and deploy Roomora**, puis **Run workflow → main → Run workflow**. Attendre la réussite du déploiement, puis recharger Roomora.
+7. Dans <https://github.com/TrueBallKnower/Roomora/actions>, ouvrir **Build, test and deploy KrasRoom**, puis **Run workflow → main → Run workflow**. Attendre la réussite du déploiement, puis recharger KrasRoom.
 
 Alternative à l’étape 6 : le propriétaire peut demander à Codex de renseigner ces deux valeurs publiques dans `src/cloudDeployment.json` et de pousser le fichier. Cela déclenche automatiquement le déploiement, sans intervention dans les réglages GitHub. Ne pas utiliser simultanément d’anciennes variables Actions, car elles ont priorité sur ce fichier.
 

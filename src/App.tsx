@@ -433,11 +433,11 @@ export default function App() {
   return (
     <div className={immersive ? "app immersive-visit" : "app"}>
       <header>
-        <a className="brand" href="#" aria-label="Roomora">
+        <a className="brand" href="#" aria-label="KrasRoom">
           <span className="brand-mark">
             <Home size={21} />
           </span>
-          roomora<span className="beta">LOCAL</span>
+          KrasRoom<span className="beta">LOCAL</span>
         </a>
         <div className="project-title">
           <button onClick={openProjects}>
@@ -558,7 +558,7 @@ export default function App() {
                 Créer la 3D depuis mon plan
               </button>
               <p className="small">
-                Déposez votre plan et sa surface. Roomora propose
+                Déposez votre plan et sa surface. KrasRoom propose
                 automatiquement les murs, pièces et ouvertures.
               </p>
               <p className="section-label">CORRIGER OU AJUSTER</p>
@@ -1122,7 +1122,7 @@ export default function App() {
                       const c = document.querySelector("canvas");
                       if (c)
                         c.toBlob((b) => {
-                          if (b) download(b, "roomora-vue.png");
+                          if (b) download(b, "krasroom-vue.png");
                         });
                     }}
                   >
@@ -1803,7 +1803,7 @@ export default function App() {
             className="modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Gestion Roomora"
+            aria-label="Gestion KrasRoom"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -2064,7 +2064,7 @@ export default function App() {
                 <p>
                   Déposez votre plan dans l’espace central ou ouvrez{" "}
                   <strong>Mon plan → 3D</strong>. Indiquez la surface totale :
-                  Roomora propose automatiquement les murs, les pièces et les
+                  KrasRoom propose automatiquement les murs, les pièces et les
                   ouvertures. Les éléments signalés peuvent être corrigés dans
                   Structure.
                 </p>

@@ -1,4 +1,4 @@
-name: Build, test and deploy Roomora
+name: Build, test and deploy KrasRoom
 on:
   push:
     branches: [main]

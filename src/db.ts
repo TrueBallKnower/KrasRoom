@@ -83,7 +83,7 @@ export async function importProject(blob: Blob) {
   );
   if (candidates.length !== 1)
     throw Error(
-      "La sauvegarde doit contenir un seul fichier project.json. Sélectionnez le ZIP Roomora.",
+      "La sauvegarde doit contenir un seul fichier project.json. Sélectionnez le ZIP KrasRoom.",
     );
   const projectPath = candidates[0];
   const prefix = projectPath.slice(0, -"project.json".length);

@@ -35,7 +35,7 @@ export default function FurnitureSources() {
       <small>
         Vérifiez le format et la licence sur le site source. Une page produit
         IKEA est une référence, pas un fichier 3D. Aucun compte de ces sites
-        n’est connecté à Roomora.
+        n’est connecté à KrasRoom.
       </small>
     </section>
   );

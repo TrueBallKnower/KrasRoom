@@ -1,4 +1,6 @@
-# Roomora
+# KrasRoom
+
+Anciennement Roomora. Le dépôt et l’adresse GitHub Pages restent `TrueBallKnower/Roomora` et `https://trueballknower.github.io/Roomora/`. Les identifiants de stockage, les comptes et le format `.roomora.zip` sont conservés pour retrouver les projets et sauvegardes existants.
 
 Application d’aménagement intérieur en français, entièrement exécutée dans le navigateur. React, TypeScript, Vite, Three.js / React Three Fiber, Zustand et IndexedDB. Aucun compte, serveur applicatif, abonnement ou clé API n’est nécessaire.
 
@@ -25,7 +27,7 @@ Un appartement de 48 m² est disponible au premier lancement. Le menu du nom de 
 
 1. **Déposez votre image/PDF dans l’espace central**, ou cliquez sur **Mon plan → 3D** dans la barre du haut.
 2. Indiquez la **surface intérieure totale en m²**, hors balcon/terrasse.
-3. Cliquez sur **Créer mon appartement en 3D**. Roomora analyse localement l’image dans un Web Worker, extrait les murs, recherche les contours fermés des pièces, propose les portes/fenêtres, estime l’échelle et ouvre la vue 3D. Aucun segment à tracer pour commencer. Un nouveau projet est créé ; l’ancien est sauvegardé et conservé.
+3. Cliquez sur **Créer mon appartement en 3D**. KrasRoom analyse localement l’image dans un Web Worker, extrait les murs, recherche les contours fermés des pièces, propose les portes/fenêtres, estime l’échelle et ouvre la vue 3D. Aucun segment à tracer pour commencer. Un nouveau projet est créé ; l’ancien est sauvegardé et conservé.
 4. La bannière indique les ouvertures à vérifier. **Vérifier les ouvertures** ouvre leurs propriétés : confirmez une proposition, changez son type, ses dimensions ou supprimez-la si nécessaire.
 
 Formats PDF (première page), PNG, JPG et WebP ; limite 30 Mo. Le traitement utilise une copie réduite à 960 pixels sur le plus grand côté, sans envoyer le plan à un serveur et sans clé/API payante.
@@ -61,7 +63,7 @@ Les ZIP/dossiers sont préparés dans un worker ; l’import affiche les étapes
 
 Le menu des projets affiche le poids des ressources, l’usage et le quota annoncés par le navigateur. La demande de stockage persistant dépend de son accord. Les limites sont de 100 Mo par fichier ou dossier de modèle (150 Mo après intégration des textures glTF), 200 Mo décompressés pour un ZIP de meuble et 300/500 Mo par archive de projet ; les quotas ne garantissent pas la capacité de la mémoire graphique.
 
-Respectez les licences des modèles téléchargés. Les meubles intégrés sont créés par le code de Roomora ; ils ne nécessitent pas de modèles payants.
+Respectez les licences des modèles téléchargés. Les meubles intégrés sont créés par le code de KrasRoom ; ils ne nécessitent pas de modèles payants.
 
 ## Sauvegarder et transférer
 
@@ -108,7 +110,7 @@ Si les autorisations API ne permettent pas l’activation automatique :
 
 1. Dans le dépôt, ouvrez **Settings → Pages → Build and deployment → Source → GitHub Actions**.
 2. Pour l’hébergement gratuit standard, utilisez un dépôt public. Le caractère public du dépôt n’est pas modifié automatiquement.
-3. Ouvrez **Actions → Build, test and deploy Roomora → Run workflow → main** si aucun push récent n’a déclenché le workflow.
+3. Ouvrez **Actions → Build, test and deploy KrasRoom → Run workflow → main** si aucun push récent n’a déclenché le workflow.
 4. Attendez la réussite du job **deploy**. L’URL réellement publiée figure dans son environnement `github-pages`.
 
 L’adresse attendue est `https://trueballknower.github.io/Roomora/` ; sa présence ici ne constitue pas une confirmation de déploiement. `base: './'` garantit les chemins relatifs du JavaScript, du worker PDF et des ressources, y compris sous le chemin du dépôt. Aucun secret n’est nécessaire dans Actions.
@@ -127,7 +129,7 @@ L’adresse attendue est `https://trueballknower.github.io/Roomora/` ; sa prése
 - `src/db.ts` : IndexedDB et sauvegardes portables.
 - `src/App.tsx`, `src/AssetImage.tsx`, `src/style.css` : interface et propriétés.
 
-La reconnaissance automatique est limitée aux plans orthogonaux suffisamment contrastés ; elle ne lit pas les cotes ou les noms des pièces et ne garantit pas les types d’ouvertures. OBJ/MTL, textures KTX2, favoris, textures de matériaux personnalisées, estimation de circulation et bibliothèque de modèles externes sous licence ne sont pas implémentés. Les plafonds sont simplifiés. Le mode réaliste améliore les matières, les arêtes et l’éclairage local ; les meubles intégrés restent des formes simplifiées. Un modèle importé détaillé conserve ses matériaux PBR et ses textures, sans que Roomora puisse inventer les détails manquants. Les gros modèles peuvent ralentir l’appareil et les archives importantes nécessitent de la mémoire. L’application fonctionne comme site statique sans backend ; elle n’installe pas encore de service worker pour une utilisation hors réseau après fermeture du serveur.
+La reconnaissance automatique est limitée aux plans orthogonaux suffisamment contrastés ; elle ne lit pas les cotes ou les noms des pièces et ne garantit pas les types d’ouvertures. OBJ/MTL, textures KTX2, favoris, textures de matériaux personnalisées, estimation de circulation et bibliothèque de modèles externes sous licence ne sont pas implémentés. Les plafonds sont simplifiés. Le mode réaliste améliore les matières, les arêtes et l’éclairage local ; les meubles intégrés restent des formes simplifiées. Un modèle importé détaillé conserve ses matériaux PBR et ses textures, sans que KrasRoom puisse inventer les détails manquants. Les gros modèles peuvent ralentir l’appareil et les archives importantes nécessitent de la mémoire. L’application fonctionne comme site statique sans backend ; elle n’installe pas encore de service worker pour une utilisation hors réseau après fermeture du serveur.
 
 ### Placer un écran ou une étagère au mur
 Sélectionnez l’objet en vue 3D, puis activez **Fixer au mur · M** et glissez-le vers la face visible d’un mur. Il suit la souris horizontalement et verticalement, se tourne parallèlement au mur et reste devant sa surface. L’objet doit être moins large et moins haut que le mur. Les ouvertures ne sont pas exclues automatiquement.

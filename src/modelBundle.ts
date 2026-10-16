@@ -75,7 +75,7 @@ export async function prepareFurnitureFile(
   });
   if (Object.keys(files).some((p) => /(^|\/)project\.json$/.test(p)))
     throw Error(
-      "Ceci est une sauvegarde Roomora. Utilisez le menu du projet → Restaurer une sauvegarde ZIP.",
+      "Ceci est une sauvegarde KrasRoom. Utilisez le menu du projet → Restaurer une sauvegarde ZIP.",
     );
   const paths = Object.keys(files).filter((p) => /\.(glb|gltf)$/i.test(p));
   if (paths.length !== 1)

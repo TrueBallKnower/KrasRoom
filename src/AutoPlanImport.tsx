@@ -85,7 +85,7 @@ export default function AutoPlanImport({
       <h2>
         Déposez votre plan.
         <br />
-        Roomora construit la 3D.
+        KrasRoom construit la 3D.
       </h2>
       <p className="small">
         Une image ou un PDF, la surface totale de votre appartement, et
@@ -134,7 +134,7 @@ export default function AutoPlanImport({
       </label>
       <p className="notice">
         Utilisez la surface habitable des pièces, hors balcon. Elle sert à
-        estimer les dimensions ; Roomora ne lit pas encore les cotes imprimées.
+        estimer les dimensions ; KrasRoom ne lit pas encore les cotes imprimées.
         Les ouvertures proposées restent à vérifier.
       </p>
       <details className="detection-settings">
