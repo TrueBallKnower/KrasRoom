@@ -1240,3 +1240,100 @@ test("matériaux, palette et roue chromatique se sauvegardent et se rendent en 3
   ).toHaveValue("1.2");
   expect(errors).toEqual([]);
 });
+
+test("L masque l’interface de visite, garde les réglages et fonctionne avec la souris capturée", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Visite", exact: true }).click();
+  await page
+    .getByLabel("Hauteur des yeux", { exact: true })
+    .selectOption("1.65");
+  await page.getByLabel("Champ de vision", { exact: true }).fill("80");
+  // The fallback must work even on browsers that do not expose native fullscreen.
+  await page.evaluate(() => {
+    document.documentElement.requestFullscreen = () =>
+      Promise.reject(new Error("Unavailable"));
+  });
+  await page.getByText("Confort de visite", { exact: true }).click();
+  await page.keyboard.press("l");
+  await expect(page.locator(".app")).toHaveClass(/immersive-visit/);
+  await expect(page.locator("header")).toBeHidden();
+  await expect(page.locator(".visit-settings")).toBeHidden();
+  await expect(page.locator(".render-controls")).toBeHidden();
+  await expect(page.locator(".drawing-toolbar")).toBeHidden();
+  await expect(page.locator(".left")).toBeHidden();
+  await expect(page.locator(".right")).toBeHidden();
+  const size = page.viewportSize()!;
+  await expect
+    .poll(async () => (await page.locator("canvas").boundingBox())?.width)
+    .toBeCloseTo(size.width, 0);
+  await expect
+    .poll(async () => (await page.locator("canvas").boundingBox())?.height)
+    .toBeCloseTo(size.height, 0);
+  const rect = (await page.locator("canvas").boundingBox())!;
+  expect(rect.x).toBe(0);
+  expect(rect.y).toBe(0);
+  await page.keyboard.press("l");
+  await expect(page.locator(".visit-settings")).toBeVisible();
+  await expect(
+    page.getByLabel("Hauteur des yeux", { exact: true }),
+  ).toHaveValue("1.65");
+  await expect(page.getByLabel("Champ de vision", { exact: true })).toHaveValue(
+    "80",
+  );
+  // Typing L in a project name must never hide the interface.
+  await page.getByRole("button", { name: /Appartement · 48/ }).click();
+  const name = page.getByLabel("Nom du projet actif", { exact: true });
+  await name.fill("L");
+  await name.press("l");
+  await expect(page.locator(".app")).not.toHaveClass(/immersive-visit/);
+  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  await page.locator("canvas").click({ position: { x: 200, y: 200 } });
+  await expect
+    .poll(() => page.evaluate(() => !!document.pointerLockElement))
+    .toBe(true);
+  await page.keyboard.press("l");
+  await expect(page.locator(".app")).toHaveClass(/immersive-visit/);
+  await expect(
+    page.getByRole("button", { name: "Afficher l’interface · L", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("l");
+  await expect(page.locator(".app")).not.toHaveClass(/immersive-visit/);
+  await page.evaluate(() => document.exitPointerLock());
+  await page
+    .getByRole("button", { name: "Visite sans interface · L", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Afficher l’interface · L", exact: true })
+    .click();
+  await expect(page.locator("header")).toBeVisible();
+});
+
+test("la visite immersive entre et sort du plein écran natif", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Visite", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Visite sans interface · L", exact: true })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(true);
+  await expect(page.locator(".render-controls")).toBeHidden();
+  await page.keyboard.press("l");
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(false);
+  await expect(page.locator(".visit-settings")).toBeVisible();
+  await page.keyboard.press("l");
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(true);
+  await page.evaluate(() => document.exitFullscreen());
+  await expect(page.locator(".app")).not.toHaveClass(/immersive-visit/);
+});

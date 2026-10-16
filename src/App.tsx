@@ -1,3 +1,4 @@
+import { useImmersiveVisit } from "./useImmersiveVisit";
 import {
   lightingProfiles,
   readRenderPreferences,
@@ -176,6 +177,11 @@ export default function App() {
       /* Preferences do not block project editing. */
     }
   }, [lighting, exposure, realistic]);
+  const {
+    immersive,
+    locked: visitLocked,
+    toggle: toggleImmersive,
+  } = useImmersiveVisit(view === "walk", !!modal || busy);
   const saved = !loaded
     ? "Chargement…"
     : saveError
@@ -410,7 +416,7 @@ export default function App() {
         c[0].toLowerCase().includes(query.toLowerCase()),
     );
   return (
-    <div className="app">
+    <div className={immersive ? "app immersive-visit" : "app"}>
       <header>
         <a className="brand" href="#" aria-label="Roomora">
           <span className="brand-mark">
@@ -949,12 +955,19 @@ export default function App() {
                 )}
                 <div className="canvas-hint">
                   {view === "walk"
-                    ? "Cliquez pour visiter · ZQSD / WASD pour avancer · Échap pour libérer la souris"
+                    ? "Cliquez pour visiter · ZQSD / WASD pour avancer · L : masquer l’interface · Échap : libérer la souris"
                     : "Gauche : tourner / déplacer un meuble · Clic droit ou Espace + glisser : déplacer la vue · Molette : zoom au curseur"}
                 </div>
                 {view === "walk" && (
                   <div className="visit-settings">
                     <strong>Confort de visite</strong>
+                    <button
+                      className="outline"
+                      onClick={toggleImmersive}
+                      title="Masquer l’interface et visiter en plein écran · L"
+                    >
+                      Visite sans interface · L
+                    </button>
                     <label>
                       Hauteur des yeux{" "}
                       <select
@@ -1733,6 +1746,11 @@ export default function App() {
           e.target.value = "";
         }}
       />
+      {immersive && !visitLocked && (
+        <button className="immersive-return" onClick={toggleImmersive}>
+          Afficher l’interface · L
+        </button>
+      )}
       {message && (
         <div className="toast" role="status">
           {message}

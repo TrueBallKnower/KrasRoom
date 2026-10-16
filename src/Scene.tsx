@@ -570,7 +570,9 @@ function Walk({
     camera.position.addScaledVector(velocity.current, dt);
     camera.position.y = eyeHeight;
   });
-  return <PointerLockControls pointerSpeed={0.65} />;
+  return (
+    <PointerLockControls selector=".viewport canvas" pointerSpeed={0.65} />
+  );
 }
 function DropFurniture() {
   const { gl, camera } = useThree();
