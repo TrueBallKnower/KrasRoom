@@ -899,11 +899,27 @@ test("proportions, unités et dissociation d’un ensemble restent sauvegardable
   await page.getByLabel("Largeur", { exact: true }).fill("6");
   await expect(page.getByLabel("Profondeur", { exact: true })).toHaveValue("1");
   await page
-    .getByRole("button", { name: "Dissocier cet ensemble 3D", exact: true })
+    .getByRole("button", { name: "Atelier 3D · retirer le décor", exact: true })
     .click();
   await expect(
     page.getByText("Fauteuil séparé", { exact: true }),
   ).toBeVisible();
+  await page
+    .getByRole("checkbox", { name: "Garder Fauteuil séparé", exact: true })
+    .uncheck();
+  await page
+    .getByRole("button", { name: "Appliquer · garder 1 éléments", exact: true })
+    .click();
+  await expect(page.locator("footer")).toContainText("6 meubles");
+  await page.getByTitle("Annuler · ⌘Z").click();
+  await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+  await page.locator('g[data-item="true"]').last().click({ force: true });
+  await page
+    .getByRole("button", { name: "Atelier 3D · retirer le décor", exact: true })
+    .click();
+  await expect(
+    page.getByRole("checkbox", { name: "Garder Fauteuil séparé", exact: true }),
+  ).toBeChecked();
   await page
     .getByRole("button", { name: "Dissocier ces 2 sous-objets", exact: true })
     .click();

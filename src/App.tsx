@@ -1087,7 +1087,7 @@ export default function App() {
                   className="outline full"
                   onClick={() => setModal("split")}
                 >
-                  Dissocier cet ensemble 3D
+                  Atelier 3D · retirer le décor
                 </button>
               )}
               <div className="property-section">
@@ -1680,7 +1680,7 @@ export default function App() {
                     select(items[0]?.id || null);
                     setModal(null);
                     notify(
-                      "Ensemble dissocié. Annuler permet de retrouver le groupe initial.",
+                      "Atelier appliqué. Annuler permet de retrouver le modèle initial.",
                     );
                   }}
                 />

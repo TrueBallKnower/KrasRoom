@@ -1922,3 +1922,48 @@ button:focus-visible {
     height: 27px;
   }
 }
+
+.workshop-preview {
+  height: 300px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #cbd5df;
+  margin: 16px 0 32px;
+  position: relative;
+}
+.workshop-preview > span {
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  color: #172536;
+  pointer-events: none;
+  background: #ffffffd9;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.workshop-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.model-parts .workshop-selected {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.model-parts label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.model-parts input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.model-parts > div {
+  flex-wrap: wrap;
+  align-items: center;
+}
