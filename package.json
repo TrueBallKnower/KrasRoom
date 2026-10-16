@@ -9,11 +9,13 @@
     "test": "vitest run",
     "preview": "vite preview --host 0.0.0.0",
     "test:e2e": "playwright test",
-    "format": "prettier --write src e2e *.ts *.json .github/workflows/deploy.yml"
+    "format": "prettier --write src e2e *.ts *.json .github/workflows/deploy.yml",
+    "test:cloud:e2e": "playwright test --config playwright.cloud.config.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.0",
     "@react-three/fiber": "^9.3.0",
+    "@supabase/supabase-js": "^2.118.0",
     "fflate": "^0.8.2",
     "idb": "^8.0.3",
     "lucide-react": "^0.468.0",

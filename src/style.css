@@ -2161,3 +2161,15 @@ button:focus-visible {
   font-size: 12px;
   backdrop-filter: blur(8px);
 }
+.account-button {
+  white-space: nowrap;
+  font-size: 11px;
+}
+@media (max-width: 800px) {
+  .account-button {
+    max-width: 105px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 7px 6px;
+  }
+}

@@ -21,6 +21,11 @@ export default defineConfig({
         command: "npm run dev -- --port 5173",
         url: "http://127.0.0.1:5173",
         reuseExistingServer: !process.env.CI,
+        env: {
+          VITE_SUPABASE_URL: "",
+          VITE_SUPABASE_ANON_KEY: "",
+          VITE_ROOMORA_DISABLE_CLOUD: "true",
+        },
       },
   workers: 1,
   reporter: process.env.CI ? [["list"], ["github"]] : "list",

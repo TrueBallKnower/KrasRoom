@@ -1430,3 +1430,22 @@ test("importe réellement un GLB de 100 Mo, le rend et restaure ses octets depui
     await unlink(path);
   }
 });
+
+test("sans service configuré, Mon compte annonce clairement l’activation nécessaire", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Mon compte", exact: true }).click();
+  await expect(
+    page.getByText(
+      "La connexion et les sauvegardes entre ordinateurs doivent encore être activées sur ce site.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Se connecter", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  await expect(page.locator("footer")).toContainText("5 meubles");
+});

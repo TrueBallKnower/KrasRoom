@@ -1,3 +1,5 @@
+import { useCloudSync } from "./useCloudSync";
+import { useCloud } from "./cloudState";
 import { useImmersiveVisit } from "./useImmersiveVisit";
 import {
   lightingProfiles,
@@ -83,6 +85,7 @@ import FurnitureSources from "./FurnitureSources";
 import StorageStatus from "./StorageStatus";
 import DimensionsEditor from "./DimensionsEditor";
 import { edgeWallDistance } from "./placement";
+const AccountPanel = lazy(() => import("./AccountPanel"));
 const SplitModel = lazy(() => import("./SplitModel"));
 import CameraToolbar from "./CameraToolbar";
 import AssetImage from "./AssetImage";
@@ -160,7 +163,14 @@ export default function App() {
     [saveError, setSaveError] = useState(false),
     [loaded, setLoaded] = useState(false),
     [modal, setModal] = useState<
-      null | "projects" | "import" | "reference" | "help" | "autoPlan" | "split"
+      | null
+      | "projects"
+      | "import"
+      | "reference"
+      | "help"
+      | "autoPlan"
+      | "split"
+      | "account"
     >(null),
     [allProjects, setAllProjects] = useState<Project[]>([]),
     [personal, setPersonal] = useState<Item[]>([]),
@@ -182,6 +192,11 @@ export default function App() {
     locked: visitLocked,
     toggle: toggleImmersive,
   } = useImmersiveVisit(view === "walk", !!modal || busy);
+  useCloudSync(p, loaded);
+  const cloud = useCloud();
+  useEffect(() => {
+    if (cloud.recovery) setModal("account");
+  }, [cloud.recovery]);
   const saved = !loaded
     ? "Chargement…"
     : saveError
@@ -436,6 +451,24 @@ export default function App() {
           </span>
         </div>
         <div className="header-actions">
+          <button
+            className="outline account-button"
+            onClick={() => setModal("account")}
+            title={
+              cloud.error ||
+              cloud.status ||
+              "Retrouver mes appartements sur un autre ordinateur"
+            }
+          >
+            Mon compte
+            {cloud.session
+              ? cloud.busy
+                ? " · Envoi…"
+                : cloud.error
+                  ? " · À vérifier"
+                  : " · Connecté"
+              : ""}
+          </button>
           <button
             className="outline"
             title="Créer automatiquement mon appartement depuis un plan"
@@ -1780,7 +1813,18 @@ export default function App() {
             >
               <X size={20} />
             </button>
-            {modal === "autoPlan" ? (
+            {modal === "account" ? (
+              <Suspense fallback={<p>Chargement du compte…</p>}>
+                <AccountPanel
+                  project={p}
+                  onOpen={(next) => {
+                    set(next);
+                    setView("2d");
+                    setModal(null);
+                  }}
+                />
+              </Suspense>
+            ) : modal === "autoPlan" ? (
               <AutoPlanImport
                 initial={autoFile}
                 onGenerated={async (next) => {
