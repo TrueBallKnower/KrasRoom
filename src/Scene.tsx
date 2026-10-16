@@ -1,3 +1,5 @@
+import { useTouchDevice } from "./useDevice";
+import { useTouchWalk } from "./TouchVisit";
 import {
   Suspense,
   useEffect,
@@ -24,6 +26,7 @@ import {
 } from "@react-three/drei";
 import {
   Box3,
+  Euler,
   PMREMGenerator,
   ACESFilmicToneMapping,
   NeutralToneMapping,
@@ -511,7 +514,8 @@ function Walk({
   fieldOfView: number;
   speed: number;
 }) {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
+  const touch = useTouchDevice();
   const p = useStore((s) => s.project);
   const start = useMemo(() => visitStart(p), [p.id]);
   const keys = useRef(new Set<string>());
@@ -550,8 +554,52 @@ function Walk({
       document.removeEventListener("pointerlockchange", clear);
     };
   }, []);
+  useEffect(() => {
+    if (!touch) return;
+    const canvas = gl.domElement;
+    let pointer: { id: number; x: number; y: number } | undefined;
+    const down = (e: PointerEvent) => {
+      if (e.pointerType !== "touch" || pointer) return;
+      pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      canvas.setPointerCapture(e.pointerId);
+    };
+    const move = (e: PointerEvent) => {
+      if (!pointer || pointer.id !== e.pointerId) return;
+      const rotation = new Euler().setFromQuaternion(camera.quaternion, "YXZ");
+      rotation.y -= (e.clientX - pointer.x) * 0.005;
+      rotation.x = Math.max(
+        -1.35,
+        Math.min(1.35, rotation.x - (e.clientY - pointer.y) * 0.005),
+      );
+      camera.quaternion.setFromEuler(rotation);
+      pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    };
+    const up = (e: PointerEvent) => {
+      if (e.pointerId === pointer?.id) pointer = undefined;
+    };
+    const reset = () => {
+      pointer = undefined;
+    };
+    canvas.addEventListener("pointerdown", down);
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
+    canvas.addEventListener("lostpointercapture", up);
+    window.addEventListener("blur", reset);
+    document.addEventListener("visibilitychange", reset);
+    return () => {
+      canvas.removeEventListener("pointerdown", down);
+      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerup", up);
+      canvas.removeEventListener("pointercancel", up);
+      canvas.removeEventListener("lostpointercapture", up);
+      window.removeEventListener("blur", reset);
+      document.removeEventListener("visibilitychange", reset);
+      useTouchWalk.getState().move(0, 0);
+    };
+  }, [touch, gl, camera]);
   useFrame((_, delta) => {
-    if (!document.pointerLockElement) return;
+    if (!document.pointerLockElement && !touch) return;
     const dt = Math.min(delta, 0.05),
       k = keys.current;
     const forward = camera.getWorldDirection(new Vector3());
@@ -565,12 +613,18 @@ function Walk({
     if (k.has("KeyD") || k.has("ArrowRight")) direction.add(right);
     if (k.has("KeyA") || k.has("KeyQ") || k.has("ArrowLeft"))
       direction.sub(right);
+    if (touch) {
+      const movement = useTouchWalk.getState();
+      direction
+        .addScaledVector(forward, movement.y)
+        .addScaledVector(right, movement.x);
+    }
     direction.normalize().multiplyScalar(speed);
     velocity.current.lerp(direction, 1 - Math.exp(-12 * dt));
     camera.position.addScaledVector(velocity.current, dt);
     camera.position.y = eyeHeight;
   });
-  return (
+  return touch ? null : (
     <PointerLockControls selector=".viewport canvas" pointerSpeed={0.65} />
   );
 }
@@ -650,6 +704,7 @@ export default function Scene({
   onError: (s: string) => void;
 }) {
   const { project: p, selected, select, change } = useStore();
+  const touchDevice = useTouchDevice();
   const light = lightingProfiles[lighting];
   const fabricTexture = useSurfaceMaps("fabric", 1, 0, realistic);
   const bounds = useMemo(() => {
@@ -716,6 +771,7 @@ export default function Scene({
   const { mode, space, placement: placementMode } = useNavigation();
   const panning = mode === "pan" || space;
   const orbit = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+  const touchPointers = useRef(new Set<number>());
   function cancelDrag() {
     setGuides([]);
     gesture.current = null;
@@ -726,7 +782,10 @@ export default function Scene({
     const cancel = (e: KeyboardEvent) => {
       if (e.key === "Escape") cancelDrag();
     };
-    const blur = () => cancelDrag();
+    const blur = () => {
+      touchPointers.current.clear();
+      cancelDrag();
+    };
     window.addEventListener("keydown", cancel);
     window.addEventListener("blur", blur);
     return () => {
@@ -738,6 +797,7 @@ export default function Scene({
     if (panning) cancelDrag();
   }, [panning]);
   useEffect(() => {
+    touchPointers.current.clear();
     cancelDrag();
   }, [placementMode, p.id]);
   const ground = useMemo(() => new Plane(new Vector3(0, 1, 0), 0), []);
@@ -817,6 +877,16 @@ export default function Scene({
   }
   return (
     <Canvas
+      onPointerDownCapture={(e) => {
+        if (e.pointerType !== "touch") return;
+        touchPointers.current.add(e.pointerId);
+        if (touchPointers.current.size > 1) cancelDrag();
+      }}
+      onPointerUpCapture={(e) => touchPointers.current.delete(e.pointerId)}
+      onPointerCancelCapture={(e) => {
+        touchPointers.current.delete(e.pointerId);
+        cancelDrag();
+      }}
       shadows
       frameloop={paused ? "never" : walk ? "always" : "demand"}
       style={{
@@ -829,7 +899,7 @@ export default function Scene({
               ? "move"
               : "grab",
       }}
-      dpr={[1, quality ? 2 : 1.25]}
+      dpr={[1, touchDevice ? (quality ? 1.5 : 1) : quality ? 2 : 1.25]}
       gl={{ preserveDrawingBuffer: true }}
       camera={{
         position: [11, 10, 13],
@@ -935,6 +1005,7 @@ export default function Scene({
                   onPointerDown={(e) => {
                     if (
                       walk ||
+                      touchPointers.current.size > 1 ||
                       panning ||
                       e.button !== 0 ||
                       e.ctrlKey ||

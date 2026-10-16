@@ -39,6 +39,15 @@ export default function Plan({
       point: Point;
     } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
+  const touches = useRef(new Map<number, Point>());
+  const pinch = useRef<{
+    distance: number;
+    zoom: number;
+    origin: Point;
+    center: Point;
+    inverse: DOMMatrix;
+  } | null>(null);
+  const touchTap = useRef<{ x: number; y: number } | null>(null);
   const [guides, setGuides] = useState<AlignmentGuide[]>([]);
   const dragStart = useRef<{
     x: number;
@@ -46,6 +55,14 @@ export default function Plan({
     sx: number;
     sy: number;
   } | null>(null);
+  function cancelGesture() {
+    touches.current.clear();
+    pinch.current = null;
+    touchTap.current = null;
+    setDrag(null);
+    dragStart.current = null;
+    setGuides([]);
+  }
   function fitPlan() {
     if (!p.walls.length) {
       setZoom(1);
@@ -68,6 +85,8 @@ export default function Plan({
   }
   useEffect(() => {
     fitPlan();
+    cancelGesture();
+    setPoints([]);
   }, [p.id]);
   useEffect(() => {
     setPoints([]);
@@ -219,13 +238,15 @@ export default function Plan({
     const cancel = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setPoints([]);
-        setDrag(null);
-        dragStart.current = null;
-        setGuides([]);
+        cancelGesture();
       }
     };
     window.addEventListener("keydown", cancel);
-    return () => window.removeEventListener("keydown", cancel);
+    window.addEventListener("blur", cancelGesture);
+    return () => {
+      window.removeEventListener("keydown", cancel);
+      window.removeEventListener("blur", cancelGesture);
+    };
   }, []);
   const draft = drag ? p.items.find((i) => i.id === drag.id) : null;
   return (
@@ -239,6 +260,67 @@ export default function Plan({
       <svg
         ref={svg}
         className="plan-svg"
+        onPointerDownCapture={(e) => {
+          if (e.pointerType !== "touch") return;
+          touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (touches.current.size !== 2) return;
+          const [a, b] = [...touches.current.values()];
+          const inverse = svg.current!.getScreenCTM()!.inverse();
+          const center = new DOMPoint(
+            (a.x + b.x) / 2,
+            (a.y + b.y) / 2,
+          ).matrixTransform(inverse);
+          pinch.current = {
+            distance: distance(a, b),
+            zoom,
+            origin,
+            center,
+            inverse,
+          };
+          touchTap.current = null;
+          setDrag(null);
+          dragStart.current = null;
+          setGuides([]);
+          svg.current!.setPointerCapture(e.pointerId);
+          e.stopPropagation();
+        }}
+        onPointerMoveCapture={(e) => {
+          if (e.pointerType !== "touch") return;
+          if (touches.current.has(e.pointerId))
+            touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (!pinch.current) return;
+          e.stopPropagation();
+          if (touches.current.size < 2) return;
+          const [a, b] = [...touches.current.values()],
+            start = pinch.current;
+          const nextZoom = Math.max(
+            0.3,
+            Math.min(
+              4,
+              (start.zoom * distance(a, b)) / Math.max(1, start.distance),
+            ),
+          );
+          const mid = new DOMPoint(
+            (a.x + b.x) / 2,
+            (a.y + b.y) / 2,
+          ).matrixTransform(start.inverse);
+          setZoom(nextZoom);
+          setOrigin({
+            x:
+              start.center.x -
+              ((mid.x - start.origin.x) * start.zoom) / nextZoom,
+            y:
+              start.center.y -
+              ((mid.y - start.origin.y) * start.zoom) / nextZoom,
+          });
+        }}
+        onPointerUpCapture={(e) => {
+          touches.current.delete(e.pointerId);
+          if (!pinch.current) return;
+          e.stopPropagation();
+          if (!touches.current.size) pinch.current = null;
+        }}
+        onPointerCancel={cancelGesture}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -258,6 +340,11 @@ export default function Plan({
         }}
         viewBox={`${origin.x} ${origin.y} ${12 / zoom} ${9 / zoom}`}
         onPointerDown={(e) => {
+          if (e.pointerType === "touch") {
+            touchTap.current = { x: e.clientX, y: e.clientY };
+            svg.current!.setPointerCapture(e.pointerId);
+            return;
+          }
           if (e.button === 1) {
             e.preventDefault();
             return;
@@ -301,7 +388,17 @@ export default function Plan({
             setGuides(placement.guides);
           }
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
+          if (e.pointerType === "touch" && touchTap.current) {
+            if (
+              Math.hypot(
+                e.clientX - touchTap.current.x,
+                e.clientY - touchTap.current.y,
+              ) < 8
+            )
+              click(point(e));
+            touchTap.current = null;
+          }
           if (
             drag &&
             dragStart.current &&

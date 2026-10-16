@@ -9,6 +9,7 @@
     "test": "vitest run",
     "preview": "vite preview --host 0.0.0.0",
     "test:e2e": "playwright test",
+    "test:webkit:e2e": "playwright test --config playwright.webkit.config.ts",
     "format": "prettier --write src e2e *.ts *.json .github/workflows/deploy.yml",
     "test:cloud:e2e": "playwright test --config playwright.cloud.config.ts"
   },

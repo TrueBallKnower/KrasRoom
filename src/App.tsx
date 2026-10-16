@@ -1,3 +1,5 @@
+import { useMediaQuery, useTouchDevice } from "./useDevice";
+import TouchVisit from "./TouchVisit";
 import { useCloudSync } from "./useCloudSync";
 import { useCloud } from "./cloudState";
 import { useImmersiveVisit } from "./useImmersiveVisit";
@@ -136,6 +138,14 @@ export default function App() {
     past,
     future,
   } = useStore();
+  const compact = useMediaQuery(
+    "(max-width: 1100px), (pointer: coarse) and (max-width: 1400px)",
+  );
+  const touch = useTouchDevice();
+  const [mobileSettings, setMobileSettings] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<
+    "library" | "properties" | null
+  >(null);
   const [view, setView] = useState<"2d" | "3d" | "walk">("2d"),
     [tool, setTool] = useState<Tool>("select"),
     [tab, setTab] = useState("catalog"),
@@ -197,6 +207,43 @@ export default function App() {
   useEffect(() => {
     if (cloud.recovery) setModal("account");
   }, [cloud.recovery]);
+  useEffect(() => {
+    if (modal || !compact) setMobilePanel(null);
+  }, [modal, compact]);
+  useEffect(() => {
+    if (!compact || !mobilePanel) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const panel = document.querySelector<HTMLElement>(
+      'aside[data-mobile-open="true"]',
+    );
+    panel?.querySelector<HTMLButtonElement>("button")?.focus();
+    const keys = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMobilePanel(null);
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const targets = [
+        ...panel.querySelectorAll<HTMLElement>(
+          "button:not(:disabled),input:not(:disabled),select,a[href]",
+        ),
+      ].filter((node) => node.getClientRects().length);
+      const first = targets[0],
+        last = targets.at(-1);
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    };
+    panel?.addEventListener("keydown", keys);
+    return () => {
+      panel?.removeEventListener("keydown", keys);
+      previous?.focus();
+    };
+  }, [compact, mobilePanel]);
   const saved = !loaded
     ? "Chargement…"
     : saveError
@@ -367,6 +414,7 @@ export default function App() {
     const position = view === "3d" ? visitStart(p) : { x: i.x, y: i.y };
     change((p) => p.items.push({ ...i, ...position, id }));
     select(id);
+    setMobilePanel(null);
   }
   async function openProjects() {
     await run(async () => {
@@ -510,8 +558,25 @@ export default function App() {
           </button>
         </div>
       </header>
-      <div className="workspace">
-        <aside className="left">
+      <div
+        className="workspace"
+        data-view={view}
+        data-settings-open={mobileSettings}
+      >
+        <aside
+          className="left"
+          data-mobile-open={mobilePanel === "library"}
+          role={compact && mobilePanel === "library" ? "dialog" : undefined}
+          aria-modal={compact && mobilePanel === "library" ? true : undefined}
+          aria-label="Bibliothèque et construction"
+        >
+          <button
+            className="mobile-panel-close"
+            aria-label="Fermer la bibliothèque"
+            onClick={() => setMobilePanel(null)}
+          >
+            <X size={20} />
+          </button>
           <div className="sidebar-heading">
             <span>ÉDITEUR D’INTÉRIEUR</span>
             <h2>
@@ -578,6 +643,7 @@ export default function App() {
                     onClick={() => {
                       setView("2d");
                       setTool(key as Tool);
+                      setMobilePanel(null);
                     }}
                   >
                     {<Icon size={18} />}
@@ -753,6 +819,7 @@ export default function App() {
           </div>
         </aside>
         <main
+          inert={compact && mobilePanel !== null}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
@@ -828,12 +895,16 @@ export default function App() {
                 title="Plein écran"
                 onClick={() => {
                   if (document.fullscreenElement) document.exitFullscreen();
-                  else
+                  else if (document.documentElement.requestFullscreen)
                     document.documentElement
                       .requestFullscreen()
                       .catch(() =>
                         notify("Plein écran indisponible dans ce navigateur."),
                       );
+                  else
+                    notify(
+                      "Pour une vue sans barres du navigateur, ajoutez KrasRoom à l’écran d’accueil.",
+                    );
                 }}
               >
                 <Expand size={17} />
@@ -860,6 +931,7 @@ export default function App() {
                 onClick={() => {
                   setView("2d");
                   setTool(key);
+                  setMobilePanel(null);
                   if (key !== "select") setTab("build");
                 }}
               >
@@ -899,6 +971,15 @@ export default function App() {
             </div>
           )}
           <div className="viewport">
+            {view !== "2d" && (
+              <button
+                className="mobile-display-toggle"
+                aria-expanded={mobileSettings}
+                onClick={() => setMobileSettings((v) => !v)}
+              >
+                Affichage
+              </button>
+            )}
             {view === "2d" ? (
               <Plan
                 tool={tool}
@@ -987,10 +1068,15 @@ export default function App() {
                   </div>
                 )}
                 <div className="canvas-hint">
-                  {view === "walk"
-                    ? "Cliquez pour visiter · ZQSD / WASD pour avancer · L : masquer l’interface · Échap : libérer la souris"
-                    : "Gauche : tourner / déplacer un meuble · Clic droit ou Espace + glisser : déplacer la vue · Molette : zoom au curseur"}
+                  {touch
+                    ? view === "walk"
+                      ? "Glissez pour regarder · Maintenez les flèches pour avancer"
+                      : "Un doigt : tourner ou déplacer un meuble · Deux doigts : déplacer la vue et zoomer"
+                    : view === "walk"
+                      ? "Cliquez pour visiter · ZQSD / WASD pour avancer · L : masquer l’interface · Échap : libérer la souris"
+                      : "Gauche : tourner / déplacer un meuble · Clic droit ou Espace + glisser : déplacer la vue · Molette : zoom au curseur"}
                 </div>
+                {view === "walk" && touch && <TouchVisit />}
                 {view === "walk" && (
                   <div className="visit-settings">
                     <strong>Confort de visite</strong>
@@ -1144,7 +1230,15 @@ export default function App() {
             <span>{snap ? "Magnétisme activé" : "Placement libre"}</span>
           </footer>
         </main>
-        <aside className="right">
+        <aside
+          className="right"
+          data-mobile-open={mobilePanel === "properties"}
+          role={compact && mobilePanel === "properties" ? "dialog" : undefined}
+          aria-modal={
+            compact && mobilePanel === "properties" ? true : undefined
+          }
+          aria-label="Propriétés de la sélection"
+        >
           <div className="right-heading">
             <h3>
               {item
@@ -1159,7 +1253,7 @@ export default function App() {
             <button
               className="inspector-close"
               aria-label="Fermer les propriétés"
-              onClick={() => select(null)}
+              onClick={() => (compact ? setMobilePanel(null) : select(null))}
             >
               <X size={17} />
             </button>
@@ -1724,7 +1818,32 @@ export default function App() {
             </>
           )}
         </aside>
+        {compact && mobilePanel && (
+          <button
+            className="mobile-backdrop"
+            aria-label="Fermer le panneau"
+            onClick={() => setMobilePanel(null)}
+          />
+        )}
       </div>
+      <nav className="mobile-nav" aria-label="Panneaux de l’éditeur">
+        <button
+          aria-expanded={mobilePanel === "library"}
+          onClick={() =>
+            setMobilePanel(mobilePanel === "library" ? null : "library")
+          }
+        >
+          <Armchair size={20} /> Bibliothèque
+        </button>
+        <button
+          aria-expanded={mobilePanel === "properties"}
+          onClick={() =>
+            setMobilePanel(mobilePanel === "properties" ? null : "properties")
+          }
+        >
+          <Layers size={20} /> Propriétés{selected ? " · 1" : ""}
+        </button>
+      </nav>
       <input
         ref={planInput}
         hidden

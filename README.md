@@ -147,3 +147,16 @@ L’intégration Supabase est optionnelle. Sans configuration, **Mon compte** in
 Après activation : inscription/confirmation e-mail, connexion, récupération du mot de passe, sauvegarde initiale explicite puis synchronisation après 4 secondes sans modification. Les fichiers sont privés, découpés en fragments de 20 Mio et réutilisés grâce à leurs empreintes SHA-256. Les conflits entre ordinateurs n’écrasent pas la version distante ; le chargement conserve une copie des modifications locales non synchronisées. La synchronisation demande une connexion Internet et reste soumise au quota gratuit du fournisseur. Un export ZIP indépendant reste disponible.
 
 `npm run test:cloud:e2e` teste plusieurs navigateurs indépendants contre un transport simulé, sans compte réel et sans envoyer de fichiers à un fournisseur. Il ne valide pas le déploiement Supabase, ses e-mails ni ses règles RLS : ces vérifications nécessitent l’activation du vrai service.
+
+
+## Téléphone et tablette
+
+Ouvrir la même adresse dans le navigateur ; aucun abonnement ni application à installer. Sur petit écran ou tablette tactile, **Bibliothèque** et **Propriétés** ouvrent des panneaux, laissant l’appartement occuper le reste de l’écran. Toucher un meuble du catalogue pour l’ajouter, fermer les propriétés pour retrouver toute la vue, puis glisser le meuble au doigt. Ses dimensions, sa hauteur et sa rotation restent réglables dans **Propriétés**.
+
+- **Plan 2D** : deux doigts pour déplacer et pincer pour zoomer ; toucher les points du plan pour tracer avec l’outil Murs. Un pincement ne valide pas de segment.
+- **Vue 3D** : glisser sur le fond pour tourner ; deux doigts pour déplacer/zoomer. **Navigation 3D** propose les vues et les modes Au sol, Hauteur et Fixer au mur, sans raccourci clavier obligatoire.
+- **Visite** : glisser sur la vue pour regarder et maintenir les flèches à l’écran pour avancer/reculer ou se déplacer latéralement. **Affichage** donne accès au confort et à la visite sans interface ; le bouton de retour reste disponible.
+- La résolution standard est réduite sur les appareils tactiles pour limiter la charge graphique. La fluidité des gros modèles dépend de la mémoire et du processeur graphique du téléphone.
+- Les fichiers se choisissent dans Fichiers/Téléchargements. Les sauvegardes locales restent propres au navigateur ; utiliser le même compte et envoyer l’appartement en ligne pour le retrouver sur d’autres appareils.
+
+Les tests tactiles automatisés utilisent Chromium avec de vrais événements tactiles en émulation de téléphone et de tablette. Un parcours téléphone est également exécuté avec WebKit dans GitHub Actions (`npm run test:webkit:e2e`), pour vérifier l’interface sur le moteur Safari. Ces tests ne remplacent pas un contrôle sur appareils physiques iOS/Android. Le téléchargement local de WebKit est bloqué dans l’environnement de développement.
