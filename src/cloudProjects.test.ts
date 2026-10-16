@@ -6,6 +6,7 @@ import { useCloud } from "./cloudState";
 import type { Session } from "@supabase/supabase-js";
 import { demo, uid } from "./model";
 import { assetPut, assetGet, saveProject, projects } from "./db";
+import * as database from "./db";
 import {
   fingerprint,
   sha256,
@@ -315,4 +316,37 @@ describe("Reprise automatique entre appareils", () => {
     );
     expect(useCloud.getState().busy).toBe(false);
   });
+});
+
+it("ne marque pas une version distante comme synchronisée si une saisie arrive pendant l’écriture IndexedDB", async () => {
+  const user = uid(),
+    remote = demo(),
+    local = demo();
+  await saveCloudProject(remote, user);
+  const { cloudLink } = await import("./cloudMeta");
+  const before = await cloudLink(user, remote.id);
+  useStore.getState().set(local);
+  useCloud.getState().patch({ session: { user: { id: user } } as Session });
+  const original = database.saveProject;
+  const spy = vi
+    .spyOn(database, "saveProject")
+    .mockImplementation(async (p) => {
+      await original(p);
+      if (p.id === remote.id)
+        useStore.getState().change((current) => {
+          current.name = "Saisie à conserver";
+        });
+    });
+  try {
+    await expect(refreshCloudProject(user, true)).rejects.toThrow(
+      "travail local a changé",
+    );
+    expect(useStore.getState().project.name).toBe("Saisie à conserver");
+    expect((await projects()).find((p) => p.id === local.id)?.name).toBe(
+      "Saisie à conserver",
+    );
+    expect(await cloudLink(user, remote.id)).toEqual(before);
+  } finally {
+    spy.mockRestore();
+  }
 });

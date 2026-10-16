@@ -8,8 +8,10 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
     other = "b1111111-1111-4111-8111-111111111111",
     rows = new Map<string, any>(),
     files = new Map<string, Buffer>();
+  const writes: Array<{ device: string; x: number; revision: string }> = [];
   let uploads = 0;
   const blocked = new Set<BrowserContext>();
+  const reads = new Map<BrowserContext, number>();
   const a = await browser.newContext(),
     b = await browser.newContext(),
     c = await browser.newContext();
@@ -82,6 +84,7 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
           const id = url.searchParams.get("project_id")?.replace(/^eq\./, ""),
             revision = url.searchParams.get("revision")?.replace(/^eq\./, "");
           if (method === "GET") {
+            reads.set(context, (reads.get(context) || 0) + 1);
             const data = [...rows.values()].filter(
               (r) => r.owner_id === user && (!id || r.project_id === id),
             );
@@ -100,6 +103,11 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
             return reply({ code: "23505", message: "duplicate" }, 409);
           if (method === "PATCH" && (!old || old.revision !== revision))
             return reply([]);
+          writes.push({
+            device: context === a ? "A" : context === b ? "B" : "C",
+            x: body.document.project.items.at(-1)?.x,
+            revision: body.revision,
+          });
           rows.set(key, { ...body, updated_at: new Date().toISOString() });
           return reply([{ revision: body.revision }]);
         }
@@ -245,12 +253,18 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
       "2.5",
     );
     // Session restoration also resumes the current cloud apartment after reload.
+    const readsBeforeReload = reads.get(a) || 0;
     await pa.reload();
     await expect(pa.locator("footer")).toContainText("6 meubles");
     await pa.locator('g[data-item="true"]').last().click({ force: true });
     await expect(pa.getByLabel("Position X", { exact: true })).toHaveValue(
       "2.5",
     );
+    // Wait for auth restoration and its revision read, not only the local IDB view.
+    await expect
+      .poll(() => reads.get(a) || 0)
+      .toBeGreaterThan(readsBeforeReload);
+    await expect(pa.locator(".account-button")).not.toContainText("Synchro");
     // A works offline while B edits: create a genuine concurrent change.
     blocked.add(a);
     await a.setOffline(true);
@@ -284,9 +298,20 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
         exact: true,
       })
       .click();
-    await expect(pa.getByRole("alert")).toContainText(
-      "Une autre version existe en ligne",
-    );
+    try {
+      await expect(pa.getByRole("alert")).toContainText(
+        "Une autre version existe en ligne",
+      );
+    } catch (error) {
+      console.log(
+        "Cloud conflict diagnostics",
+        JSON.stringify({
+          writes,
+          modal: await pa.getByRole("dialog").innerText(),
+        }),
+      );
+      throw error;
+    }
     await login(pc, "other@example.com");
     await expect(
       pc.getByText("Aucun appartement en ligne pour le moment.", {

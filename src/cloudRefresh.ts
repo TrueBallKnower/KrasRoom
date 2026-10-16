@@ -47,15 +47,20 @@ export async function refreshCloudProject(user: string, initial: boolean) {
       user,
       (status) => useCloud.getState().patch({ status }),
       current,
+      (project) => useStore.getState().set(project),
     );
-    if (!current()) return true;
-    useStore.getState().set(project);
+    if (useStore.getState().project !== project) return true;
     useCloud.getState().patch({
       status: "À jour",
       error: "",
       tick: useCloud.getState().tick + 1,
     });
     return true;
+  } catch (error) {
+    const latest = useStore.getState().project;
+    if (latest !== snapshot && useCloud.getState().session?.user.id === user)
+      await saveProject(latest);
+    throw error;
   } finally {
     const state = useCloud.getState();
     state.patch({

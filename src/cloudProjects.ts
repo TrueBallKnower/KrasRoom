@@ -140,6 +140,7 @@ export async function openCloudProject(
   user: string,
   report: (s: string) => void = () => {},
   canApply: () => boolean = () => true,
+  onApply?: (project: Project) => void,
 ) {
   const c = await cloudClient(),
     { data, error } = await c
@@ -193,7 +194,18 @@ export async function openCloudProject(
       id: uid(),
       name: local.name + " (copie locale)",
     });
+  if (!canApply())
+    throw Error(
+      "Votre travail local a changé pendant la récupération. Il est conservé.",
+    );
   await saveProject(project);
+  // No async gap between the final guard and exposing the downloaded version.
+  // Later edits then start from this version, before its revision is recorded.
+  if (!canApply())
+    throw Error(
+      "Votre travail local a changé pendant la récupération. Il est conservé.",
+    );
+  onApply?.(project);
   await putCloudLink(user, id, {
     revision: row.revision,
     fingerprint: await fingerprint(project),
