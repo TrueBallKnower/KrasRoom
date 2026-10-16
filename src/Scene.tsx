@@ -740,13 +740,18 @@ export default function Scene({
       ),
     [p, showCollisions],
   );
-  const [drag, setDrag] = useState<{
+  const [drag, setDragState] = useState<{
     id: string;
     x: number;
     y: number;
     elevation: number;
     rotation: number;
   } | null>(null);
+  const latestDrag = useRef<typeof drag>(null);
+  function setDrag(next: typeof drag) {
+    latestDrag.current = next;
+    setDragState(next);
+  }
   const draggedItem = drag ? p.items.find((i) => i.id === drag.id) : undefined;
   const previewCollision =
     showCollisions && drag && draggedItem
@@ -852,6 +857,7 @@ export default function Scene({
     setGuides(placement.guides);
   }
   function finish(e: ThreeEvent<PointerEvent>) {
+    const drag = latestDrag.current;
     const g = gesture.current;
     if (!g) return;
     e.stopPropagation();

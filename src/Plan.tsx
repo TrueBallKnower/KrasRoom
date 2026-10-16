@@ -33,11 +33,16 @@ export default function Plan({
     [url, setUrl] = useState(""),
     [zoom, setZoom] = useState(1),
     [origin, setOrigin] = useState({ x: -1, y: -1 }),
-    [drag, setDrag] = useState<{
+    [drag, setDragState] = useState<{
       id: string;
       offset: Point;
       point: Point;
     } | null>(null);
+  const latestDrag = useRef<typeof drag>(null);
+  function setDrag(next: typeof drag) {
+    latestDrag.current = next;
+    setDragState(next);
+  }
   const svg = useRef<SVGSVGElement>(null);
   const touches = useRef(new Map<number, Point>());
   const pinch = useRef<{
@@ -356,6 +361,7 @@ export default function Plan({
             click(point(e));
         }}
         onPointerMove={(e) => {
+          const drag = latestDrag.current;
           const q = point(e);
           setHover(q);
           if (e.buttons === 4) {
@@ -389,6 +395,7 @@ export default function Plan({
           }
         }}
         onPointerUp={(e) => {
+          const drag = latestDrag.current;
           if (e.pointerType === "touch" && touchTap.current) {
             if (
               Math.hypot(
