@@ -9,6 +9,7 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
     rows = new Map<string, any>(),
     files = new Map<string, Buffer>();
   let uploads = 0;
+  const blocked = new Set<BrowserContext>();
   const a = await browser.newContext(),
     b = await browser.newContext(),
     c = await browser.newContext();
@@ -16,6 +17,7 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
     await context.route(
       "https://roomora-test.supabase.co/**",
       async (route) => {
+        if (blocked.has(context)) return route.abort("internetdisconnected");
         const request = route.request(),
           url = new URL(request.url()),
           method = request.method();
@@ -249,7 +251,9 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
     await expect(pa.getByLabel("Position X", { exact: true })).toHaveValue(
       "2.5",
     );
-    // Both devices now edit: never silently overwrite the local version.
+    // A works offline while B edits: create a genuine concurrent change.
+    blocked.add(a);
+    await a.setOffline(true);
     await pa.getByLabel("Position X", { exact: true }).fill("1.5");
     const secondRevision = rows.get(owner + "/" + id).revision;
     await pb.getByLabel("Position X", { exact: true }).fill("3.5");
@@ -263,7 +267,12 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
     await expect
       .poll(() => rows.get(owner + "/" + id).revision)
       .not.toBe(secondRevision);
+    await expect
+      .poll(() => rows.get(owner + "/" + id).document.project.items.at(-1).x)
+      .toBe(3.5);
     await pb.getByRole("button", { name: "Fermer", exact: true }).click();
+    blocked.delete(a);
+    await a.setOffline(false);
     await pa.evaluate(() => window.dispatchEvent(new Event("focus")));
     await expect(pa.getByLabel("Position X", { exact: true })).toHaveValue(
       "1.5",

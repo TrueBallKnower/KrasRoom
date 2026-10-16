@@ -103,8 +103,19 @@ export function useCloudSync(project: Project, loaded: boolean) {
     const refresh = () => {
       void (async () => {
         const user = session.user.id;
-        if (await refreshCloudProject(user, resumedUser.current !== user))
-          resumedUser.current = user;
+        if (!(await refreshCloudProject(user, resumedUser.current !== user)))
+          return;
+        resumedUser.current = user;
+        // Retry pending local edits after the read lock is released, including
+        // when their debounce expired during the revision check.
+        const current = useStore.getState().project;
+        const link = await cloudLink(user, current.id);
+        if (
+          useCloud.getState().session?.user.id === user &&
+          link &&
+          (await fingerprint(current)) !== link.fingerprint
+        )
+          await pushCloud(current);
       })().catch((e) => useCloud.getState().patch({ error: cloudError(e) }));
     };
     const visible = () => {
