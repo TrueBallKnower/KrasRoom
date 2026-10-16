@@ -90,9 +90,18 @@ test("un téléphone refusant les Blobs IndexedDB récupère réellement les fic
       ),
     ).toBeVisible();
     await login(phone);
-    await expect(phone.locator("footer")).toContainText("1 meubles", {
-      timeout: 20000,
-    });
+    try {
+      await expect(phone.locator("footer")).toContainText("1 meubles", {
+        timeout: 20000,
+      });
+    } catch (error) {
+      throw Error(
+        "Diagnostic récupération WebKit (service simulé) : " +
+          (await phone.locator("body").innerText()) +
+          "\n" +
+          String(error),
+      );
+    }
     await expect(phone.getByRole("alert")).toHaveCount(0);
     await phone.getByRole("button", { name: "Fermer", exact: true }).click();
     await phone.reload();
