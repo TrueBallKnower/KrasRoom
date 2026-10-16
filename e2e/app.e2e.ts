@@ -1101,3 +1101,142 @@ test("un écran glisse sur un mur à la hauteur choisie et reste sauvegardé", a
     page.getByLabel("Élévation au-dessus du sol", { exact: true }),
   ).toHaveValue("1.25");
 });
+
+test("matériaux, palette et roue chromatique se sauvegardent et se rendent en 3D", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("./");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page
+    .locator('.plan-svg line[stroke="transparent"]')
+    .first()
+    .click({ force: true });
+  await page.getByRole("button", { name: "Brique rouge", exact: true }).click();
+  await page.getByRole("button", { name: "Sauge", exact: true }).click();
+  await expect(page.getByLabel("Couleur du mur", { exact: true })).toHaveValue(
+    "#a4b09a",
+  );
+  const wallColors = page
+    .locator(".color-editor")
+    .filter({ has: page.getByLabel("Couleur du mur", { exact: true }) });
+  await wallColors.locator("summary").click();
+  const wheel = wallColors.locator("canvas");
+  await expect(wheel).toBeVisible();
+  await wheel.click({ position: { x: 150, y: 90 } });
+  await expect(
+    page.getByLabel("Couleur du mur", { exact: true }),
+  ).not.toHaveValue("#a4b09a");
+  await page
+    .getByLabel("Code HEX · Couleur du mur", { exact: true })
+    .fill("#a4b09a");
+  await page
+    .getByLabel("Code HEX · Couleur du mur", { exact: true })
+    .press("Enter");
+  await page.getByLabel("Échelle du motif mural", { exact: true }).fill("1.5");
+  await page
+    .getByLabel("Orientation du motif mural", { exact: true })
+    .fill("90");
+  await page
+    .getByRole("button", { name: "Appliquer à tous les murs", exact: true })
+    .click();
+  await page
+    .locator(".plan-svg polygon")
+    .first()
+    .click({ position: { x: 40, y: 40 } });
+  await page
+    .getByRole("button", { name: "Chêne en chevrons", exact: true })
+    .click();
+  const floorColors = page
+    .locator(".color-editor")
+    .filter({ has: page.getByLabel("Couleur du sol", { exact: true }) });
+  await floorColors.locator("summary").click();
+  await page
+    .getByLabel("Code HEX · Couleur du sol", { exact: true })
+    .fill("#eee5da");
+  await page
+    .getByLabel("Code HEX · Couleur du sol", { exact: true })
+    .press("Enter");
+  await page
+    .getByLabel("Orientation du motif du sol", { exact: true })
+    .fill("45");
+  const ceilingColors = page
+    .locator(".color-editor")
+    .filter({ has: page.getByLabel("Couleur du plafond", { exact: true }) });
+  await ceilingColors
+    .getByRole("button", { name: "Blanc craie", exact: true })
+    .click();
+  // Close the wheel so the only visible canvas is the apartment viewport.
+  await floorColors.locator("summary").click();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Exporter", exact: true }).click();
+  const stream = await (await download).createReadStream(),
+    chunks = [];
+  for await (const v of stream!) chunks.push(v);
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const saved = JSON.parse(
+    strFromU8(unzipSync(Buffer.concat(chunks))["project.json"]),
+  );
+  expect(
+    saved.walls.every(
+      (w: {
+        finish: string;
+        color: string;
+        textureScale: number;
+        textureAngle: number;
+      }) =>
+        w.finish === "brick" &&
+        w.color === "#a4b09a" &&
+        w.textureScale === 1.5 &&
+        w.textureAngle === 90,
+    ),
+  ).toBe(true);
+  expect(saved.rooms[0]).toMatchObject({
+    finish: "herringbone",
+    tint: "#eee5da",
+    ceilingColor: "#f5f3ed",
+    textureAngle: 45,
+  });
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  await page
+    .getByLabel("Style de rendu", { exact: true })
+    .selectOption("realistic");
+  await page
+    .getByLabel("Ambiance lumineuse", { exact: true })
+    .selectOption("warm");
+  await page.getByLabel("Exposition du rendu", { exact: true }).fill("1.2");
+  await page.getByLabel("Murs transparents", { exact: true }).uncheck();
+  await expect(page.locator("canvas")).toBeVisible();
+  await page
+    .locator("canvas")
+    .screenshot({ path: "/tmp/roomora-materials-realistic.png" });
+  await page
+    .getByLabel("Ambiance lumineuse", { exact: true })
+    .selectOption("studio");
+  await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.reload();
+  await page
+    .locator(".plan-svg polygon")
+    .first()
+    .click({ position: { x: 40, y: 40 } });
+  await expect(
+    page.getByRole("button", { name: "Chêne en chevrons", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Couleur du sol", { exact: true })).toHaveValue(
+    "#eee5da",
+  );
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  await expect(page.getByLabel("Style de rendu", { exact: true })).toHaveValue(
+    "realistic",
+  );
+  await expect(
+    page.getByLabel("Ambiance lumineuse", { exact: true }),
+  ).toHaveValue("studio");
+  await expect(
+    page.getByLabel("Exposition du rendu", { exact: true }),
+  ).toHaveValue("1.2");
+  expect(errors).toEqual([]);
+});

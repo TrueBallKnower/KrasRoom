@@ -37,6 +37,29 @@ describe("Persistance et sauvegardes portables", () => {
     );
     expect(restored.plan!.asset).toBe(restored.items[0].asset);
   });
+  it("conserve matériaux, teintes, plafonds et motifs dans IndexedDB et le ZIP", async () => {
+    const p = demo();
+    Object.assign(p.walls[0], {
+      finish: "brick",
+      color: "#a4b09a",
+      textureScale: 1.5,
+      textureAngle: 90,
+    });
+    Object.assign(p.rooms[0], {
+      finish: "herringbone",
+      tint: "#eee5da",
+      ceilingColor: "#f5f3ed",
+      textureScale: 0.75,
+      textureAngle: 45,
+    });
+    await saveProject(p);
+    const local = (await projects()).find((v) => v.id === p.id)!;
+    expect(local.walls[0]).toEqual(p.walls[0]);
+    expect(local.rooms[0]).toEqual(p.rooms[0]);
+    const restored = await importProject(await exportProject(p));
+    expect(restored.walls[0]).toEqual(p.walls[0]);
+    expect(restored.rooms[0]).toEqual(p.rooms[0]);
+  });
   it("restaure un dossier recompressé par le Finder avec ses ressources", async () => {
     const p = demo();
     const id = await assetPut(new Blob(["modèle conservé"]));

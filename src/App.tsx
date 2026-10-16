@@ -1,3 +1,8 @@
+import {
+  lightingProfiles,
+  readRenderPreferences,
+  type LightingProfile,
+} from "./lighting";
 import { useNavigation } from "./navigation";
 import {
   useCallback,
@@ -71,7 +76,8 @@ import {
   importFurnitureFiles,
   importURL,
 } from "./imports";
-import { floorFinishes } from "./floorFinishes";
+import ColorPicker from "./ColorPicker";
+import { floorFinishes, wallFinishes } from "./floorFinishes";
 import FurnitureSources from "./FurnitureSources";
 import StorageStatus from "./StorageStatus";
 import DimensionsEditor from "./DimensionsEditor";
@@ -138,7 +144,13 @@ export default function App() {
     [transparent, setTransparent] = useState(true),
     [ceiling, setCeiling] = useState(false),
     [quality, setQuality] = useState(false),
-    [realistic, setRealistic] = useState(false),
+    [realistic, setRealistic] = useState(
+      () => readRenderPreferences().realistic,
+    ),
+    [lighting, setLighting] = useState<LightingProfile>(
+      () => readRenderPreferences().lighting,
+    ),
+    [exposure, setExposure] = useState(() => readRenderPreferences().exposure),
     [eyeHeight, setEyeHeight] = useState(1.55),
     [fieldOfView, setFieldOfView] = useState(72),
     [walkSpeed, setWalkSpeed] = useState(1.4),
@@ -154,6 +166,16 @@ export default function App() {
     [busy, setBusy] = useState(false),
     [busyStage, setBusyStage] = useState("Traitement en cours…"),
     [url, setUrl] = useState("");
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "roomora-render",
+        JSON.stringify({ lighting, exposure, realistic }),
+      );
+    } catch {
+      /* Preferences do not block project editing. */
+    }
+  }, [lighting, exposure, realistic]);
   const saved = !loaded
     ? "Chargement…"
     : saveError
@@ -370,7 +392,13 @@ export default function App() {
                 onChange(v);
             }}
           />
-          <span>{label.includes("Rotation") ? "°" : "m"}</span>
+          <span>
+            {label.includes("Rotation") || label.includes("Orientation")
+              ? "°"
+              : label.startsWith("Échelle du motif")
+                ? "×"
+                : "m"}
+          </span>
         </div>
       </label>
     );
@@ -860,6 +888,8 @@ export default function App() {
                     showCollisions={showCollisions}
                     quality={quality}
                     realistic={realistic}
+                    lighting={lighting}
+                    exposure={exposure}
                     paused={!!modal || busy}
                     onError={notify}
                   />
@@ -984,6 +1014,39 @@ export default function App() {
                       </option>
                     </select>
                   </label>
+                  {realistic && (
+                    <>
+                      <label>
+                        Lumière{" "}
+                        <select
+                          aria-label="Ambiance lumineuse"
+                          value={lighting}
+                          onChange={(e) =>
+                            setLighting(e.target.value as LightingProfile)
+                          }
+                        >
+                          {Object.entries(lightingProfiles).map(([id, p]) => (
+                            <option key={id} value={id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Exposition{" "}
+                        <input
+                          aria-label="Exposition du rendu"
+                          type="range"
+                          min="0.6"
+                          max="1.6"
+                          step="0.05"
+                          value={exposure}
+                          onChange={(e) => setExposure(Number(e.target.value))}
+                        />
+                        <span>{exposure.toFixed(2)}</span>
+                      </label>
+                    </>
+                  )}
                   <label>
                     <input
                       type="checkbox"
@@ -1268,19 +1331,90 @@ export default function App() {
                 0.3,
                 10,
               )}
-              <label className="field">
-                Couleur
-                <input
-                  type="color"
-                  value={wall.color}
-                  onChange={(e) =>
-                    change((p) => {
-                      p.walls.find((w) => w.id === wall.id)!.color =
-                        e.target.value;
-                    })
-                  }
-                />
-              </label>
+              <h4>Revêtement mural</h4>
+              <div className="surface-options">
+                {wallFinishes.map((f) => (
+                  <button
+                    key={f.id}
+                    aria-pressed={(wall.finish || "paint") === f.id}
+                    onClick={() =>
+                      change((p) => {
+                        const w = p.walls.find((w) => w.id === wall.id)!;
+                        w.finish = f.id;
+                        w.color =
+                          f.id === "paint" || f.id === "satin"
+                            ? wall.color
+                            : "#ffffff";
+                      })
+                    }
+                  >
+                    <span
+                      className={`surface-swatch pattern-${f.pattern}`}
+                      style={{ backgroundColor: f.color }}
+                    />
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+              <ColorPicker
+                key={wall.id}
+                label="Couleur du mur"
+                value={wall.color}
+                onChange={(color) =>
+                  change((p) => {
+                    p.walls.find((w) => w.id === wall.id)!.color = color;
+                  })
+                }
+              />
+              <button
+                className="text-button"
+                onClick={() =>
+                  change((p) => {
+                    p.walls.find((w) => w.id === wall.id)!.color = "#ffffff";
+                  })
+                }
+              >
+                Retrouver la couleur naturelle du mur
+              </button>
+              <p className="small">
+                La couleur teinte le revêtement. Le blanc conserve sa couleur
+                naturelle.
+              </p>
+              {num(
+                "Échelle du motif mural",
+                wall.textureScale || 1,
+                (v) =>
+                  change((p) => {
+                    p.walls.find((w) => w.id === wall.id)!.textureScale = v;
+                  }),
+                0.1,
+                10,
+              )}
+              {num(
+                "Orientation du motif mural",
+                wall.textureAngle || 0,
+                (v) =>
+                  change((p) => {
+                    p.walls.find((w) => w.id === wall.id)!.textureAngle = v;
+                  }),
+                -360,
+                360,
+              )}
+              <button
+                className="outline full"
+                onClick={() =>
+                  change((p) => {
+                    for (const w of p.walls) {
+                      w.finish = wall.finish;
+                      w.color = wall.color;
+                      w.textureScale = wall.textureScale;
+                      w.textureAngle = wall.textureAngle;
+                    }
+                  })
+                }
+              >
+                Appliquer à tous les murs
+              </button>
               {wall.openings.map((o) => (
                 <div className="opening" key={o.id}>
                   <h4>
@@ -1434,29 +1568,77 @@ export default function App() {
                         })
                       }
                     >
-                      <span style={{ background: f.color }} />
+                      <span
+                        className={`surface-swatch pattern-${f.pattern}`}
+                        style={{ backgroundColor: f.color }}
+                      />
                       {f.name}
                     </button>
                   ))}
                 </div>
                 <small>
-                  Visible en 3D, conservé dans la sauvegarde. Choisissez «
-                  Couleur unie » pour utiliser la couleur ci-dessous.
+                  Visible en 3D et conservé dans la sauvegarde. Ajustez la
+                  teinte et la taille du motif ci-dessous.
                 </small>
               </div>
-              <label className="field">
-                Couleur du sol
-                <input
-                  type="color"
-                  value={room.color}
-                  onChange={(e) =>
+              <ColorPicker
+                key={room.id + "floor"}
+                label="Couleur du sol"
+                value={
+                  room.finish && room.finish !== "plain"
+                    ? room.tint || "#ffffff"
+                    : room.color
+                }
+                onChange={(color) =>
+                  change((p) => {
+                    const r = p.rooms.find((r) => r.id === room.id)!;
+                    if (r.finish && r.finish !== "plain") r.tint = color;
+                    else r.color = color;
+                  })
+                }
+              />
+              {room.finish && room.finish !== "plain" && (
+                <button
+                  className="text-button"
+                  onClick={() =>
                     change((p) => {
-                      p.rooms.find((r) => r.id === room.id)!.color =
-                        e.target.value;
+                      p.rooms.find((r) => r.id === room.id)!.tint = "#ffffff";
                     })
                   }
-                />
-              </label>
+                >
+                  Retrouver la couleur naturelle du sol
+                </button>
+              )}
+              {num(
+                "Échelle du motif du sol",
+                room.textureScale || 1,
+                (v) =>
+                  change((p) => {
+                    p.rooms.find((r) => r.id === room.id)!.textureScale = v;
+                  }),
+                0.1,
+                10,
+              )}
+              {num(
+                "Orientation du motif du sol",
+                room.textureAngle || 0,
+                (v) =>
+                  change((p) => {
+                    p.rooms.find((r) => r.id === room.id)!.textureAngle = v;
+                  }),
+                -360,
+                360,
+              )}
+              <ColorPicker
+                key={room.id + "ceiling"}
+                label="Couleur du plafond"
+                value={room.ceilingColor || "#eee9e2"}
+                onChange={(color) =>
+                  change((p) => {
+                    p.rooms.find((r) => r.id === room.id)!.ceilingColor = color;
+                  })
+                }
+              />
               <button className="danger full" onClick={remove}>
                 Supprimer la pièce
               </button>

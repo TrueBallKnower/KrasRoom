@@ -1,3 +1,4 @@
+import { floorFinishes, wallFinishes } from "./floorFinishes";
 export type Point = { x: number; y: number };
 export type Wall = {
   id: string;
@@ -7,6 +8,9 @@ export type Wall = {
   height: number;
   color: string;
   openings: Opening[];
+  finish?: import("./floorFinishes").WallFinish;
+  textureScale?: number;
+  textureAngle?: number;
   detection?: { confidence: number; reviewed: boolean };
 };
 export type Opening = {
@@ -50,6 +54,10 @@ export type Room = {
   points: Point[];
   color: string;
   finish?: import("./floorFinishes").FloorFinish;
+  tint?: string;
+  ceilingColor?: string;
+  textureScale?: number;
+  textureAngle?: number;
 };
 export type Project = {
   version: 1;
@@ -386,6 +394,9 @@ export function validateProject(v: unknown): asserts v is Project {
       w.height <= 0 ||
       w.thickness <= 0 ||
       !color(w.color) ||
+      (w.finish !== undefined &&
+        !wallFinishes.some((f) => f.id === w.finish)) ||
+      !validSurface(w) ||
       !Array.isArray(w.openings)
     )
       throw Error("Mur invalide.");
@@ -406,10 +417,11 @@ export function validateProject(v: unknown): asserts v is Project {
     if (
       !text(r.name) ||
       !color(r.color) ||
+      (r.tint !== undefined && !color(r.tint)) ||
+      (r.ceilingColor !== undefined && !color(r.ceilingColor)) ||
+      !validSurface(r) ||
       (r.finish !== undefined &&
-        !["plain", "oak", "walnut", "ash", "tile", "concrete"].includes(
-          r.finish,
-        )) ||
+        !floorFinishes.some((f) => f.id === r.finish)) ||
       !Array.isArray(r.points) ||
       r.points.length < 3 ||
       r.points.some((q) => !point(q))
@@ -473,4 +485,15 @@ export function calibrateAutomaticPlan(p: Project, factor: number) {
   }
   p.analysis.warnings[0] =
     "Échelle recalibrée sur une distance connue. Les contours détectés restent à vérifier.";
+}
+
+function validSurface(s: { textureScale?: number; textureAngle?: number }) {
+  return (
+    (s.textureScale === undefined ||
+      (Number.isFinite(s.textureScale) &&
+        s.textureScale >= 0.1 &&
+        s.textureScale <= 10)) &&
+    (s.textureAngle === undefined ||
+      (Number.isFinite(s.textureAngle) && Math.abs(s.textureAngle) <= 360))
+  );
 }

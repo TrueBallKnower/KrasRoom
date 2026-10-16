@@ -34,11 +34,12 @@ import {
   Raycaster,
   Vector2,
   type Group,
-  type Texture,
   MOUSE,
 } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { surfaceTexture } from "./materials";
+import { lightingProfiles, type LightingProfile } from "./lighting";
+import { finishDefinition } from "./floorFinishes";
+import { surfaceMaps, useSurfaceMaps } from "./materials";
 import { magneticPlacement, type AlignmentGuide } from "./placement";
 import { wallPlacement } from "./wallPlacement";
 import { wallOutline, visitStart } from "./spatial";
@@ -61,13 +62,22 @@ import {
   type Room,
 } from "./model";
 const RealismContext = createContext(false);
-const FabricContext = createContext<Texture | null>(null);
-function StudioLighting({ realistic }: { realistic: boolean }) {
-  const { scene, gl } = useThree();
+const FabricContext = createContext<ReturnType<typeof surfaceMaps> | null>(
+  null,
+);
+function StudioLighting({
+  realistic,
+  exposure,
+}: {
+  realistic: boolean;
+  exposure: number;
+}) {
+  const { scene, gl, invalidate } = useThree();
   useEffect(() => {
     const old = scene.environment,
       oldTone = gl.toneMapping,
-      oldExposure = gl.toneMappingExposure;
+      oldExposure = gl.toneMappingExposure,
+      oldIntensity = scene.environmentIntensity;
     gl.toneMapping = realistic ? ACESFilmicToneMapping : NeutralToneMapping;
     gl.toneMappingExposure = realistic ? 1.05 : 1;
     if (!realistic)
@@ -79,9 +89,10 @@ function StudioLighting({ realistic }: { realistic: boolean }) {
       room = new RoomEnvironment();
     const target = generator.fromScene(room, 0.04);
     scene.environment = target.texture;
-    scene.environmentIntensity = 0.5;
+    scene.environmentIntensity = 0.7;
     return () => {
       scene.environment = old;
+      scene.environmentIntensity = oldIntensity;
       target.dispose();
       room.dispose();
       generator.dispose();
@@ -89,6 +100,10 @@ function StudioLighting({ realistic }: { realistic: boolean }) {
       gl.toneMappingExposure = oldExposure;
     };
   }, [scene, gl, realistic]);
+  useEffect(() => {
+    gl.toneMappingExposure = realistic ? exposure : 1;
+    invalidate();
+  }, [gl, realistic, exposure, invalidate]);
   return null;
 }
 function Box({
@@ -116,8 +131,9 @@ function Box({
       >
         <meshStandardMaterial
           color={color}
-          map={fabric ? texture : null}
-          bumpMap={fabric ? texture : null}
+          map={fabric ? texture?.map : null}
+          bumpMap={fabric ? texture?.bumpMap : null}
+          roughnessMap={fabric ? texture?.roughnessMap : null}
           bumpScale={0.004}
           roughness={fabric ? 0.9 : 0.65}
         />
@@ -330,6 +346,11 @@ function WallMesh({
   walls: Wall[];
   transparent: boolean;
 }) {
+  const realistic = useContext(RealismContext);
+  const select = useStore((s) => s.select);
+  const finish = w.finish || "paint";
+  const definition = finishDefinition(finish);
+  const maps = useSurfaceMaps(finish, w.textureScale, w.textureAngle)!;
   const outline = wallOutline(w, walls);
   const length = distance(w.a, w.b),
     angle = Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x),
@@ -380,6 +401,11 @@ function WallMesh({
         />
         <meshStandardMaterial
           color={w.color}
+          map={maps.map}
+          bumpMap={realistic ? maps.bumpMap : null}
+          roughnessMap={realistic ? maps.roughnessMap : null}
+          roughness={definition.roughness}
+          bumpScale={definition.relief}
           transparent={transparent}
           opacity={transparent ? 0.23 : 1}
         />
@@ -399,14 +425,31 @@ function WallMesh({
           position={[(start + end) / 2, o.sill + o.height / 2, 0]}
         >
           <boxGeometry args={[end - start, o.height, 0.025]} />
-          <meshStandardMaterial color="#a0c7d5" transparent opacity={0.35} />
+          <meshPhysicalMaterial
+            color="#d7edf4"
+            transparent
+            opacity={realistic ? 0.22 : 0.35}
+            roughness={0.08}
+            metalness={0}
+            clearcoat={1}
+            depthWrite={false}
+          />
         </mesh>,
       );
     cursor = end;
   }
   piece(cursor, length, 0, w.height, "last");
   return (
-    <group position={[w.a.x, 0, w.a.y]} rotation={[0, -angle, 0]}>
+    <group
+      position={[w.a.x, 0, w.a.y]}
+      rotation={[0, -angle, 0]}
+      onClick={(e) => {
+        if (!document.pointerLockElement) {
+          e.stopPropagation();
+          select(w.id);
+        }
+      }}
+    >
       {parts}
     </group>
   );
@@ -415,11 +458,13 @@ function Floor({ r, ceiling }: { r: Room; ceiling?: boolean }) {
   const select = useStore((s) => s.select);
   const realistic = useContext(RealismContext);
   const finish = r.finish || "plain";
-  const texture = useMemo(
-    () => (!ceiling && finish !== "plain" ? surfaceTexture(finish) : null),
-    [finish, ceiling],
+  const definition = finishDefinition(finish);
+  const maps = useSurfaceMaps(
+    finish,
+    r.textureScale,
+    r.textureAngle,
+    !ceiling && finish !== "plain",
   );
-  useEffect(() => () => texture?.dispose(), [texture]);
   const shape = useMemo(() => {
     const s = new Shape();
     r.points.forEach((p, i) => (i ? s.lineTo(p.x, -p.y) : s.moveTo(p.x, -p.y)));
@@ -440,11 +485,18 @@ function Floor({ r, ceiling }: { r: Room; ceiling?: boolean }) {
     >
       <shapeGeometry args={[shape]} />
       <meshStandardMaterial
-        color={ceiling ? "#eee9e2" : texture ? "#ffffff" : r.color}
-        map={texture}
-        bumpMap={realistic ? texture : null}
-        bumpScale={finish === "tile" ? 0.012 : 0.006}
-        roughness={finish === "tile" ? 0.48 : 0.78}
+        color={
+          ceiling
+            ? r.ceilingColor || "#eee9e2"
+            : maps
+              ? r.tint || "#ffffff"
+              : r.color
+        }
+        map={maps?.map}
+        bumpMap={realistic ? maps?.bumpMap : null}
+        roughnessMap={realistic ? maps?.roughnessMap : null}
+        bumpScale={definition.relief}
+        roughness={ceiling ? 0.95 : definition.roughness}
         side={DoubleSide}
       />
     </mesh>
@@ -576,7 +628,11 @@ export default function Scene({
   realistic = false,
   paused = false,
   showCollisions = true,
+  lighting = "daylight",
+  exposure = 1.05,
 }: {
+  lighting?: LightingProfile;
+  exposure?: number;
   realistic?: boolean;
   paused?: boolean;
   showCollisions?: boolean;
@@ -592,11 +648,8 @@ export default function Scene({
   onError: (s: string) => void;
 }) {
   const { project: p, selected, select, change } = useStore();
-  const fabricTexture = useMemo(
-    () => (realistic ? surfaceTexture("fabric") : null),
-    [realistic],
-  );
-  useEffect(() => () => fabricTexture?.dispose(), [fabricTexture]);
+  const light = lightingProfiles[lighting];
+  const fabricTexture = useSurfaceMaps("fabric", 1, 0, realistic);
   const bounds = useMemo(() => {
     const points = [
       ...p.walls.flatMap((w) => [w.a, w.b]),
@@ -786,21 +839,42 @@ export default function Scene({
     >
       <RealismContext.Provider value={realistic}>
         <FabricContext.Provider value={fabricTexture}>
-          <StudioLighting realistic={realistic} />
+          <StudioLighting realistic={realistic} exposure={exposure} />
           {!walk && <NavigationCamera key={p.id} id={p.id} bounds={bounds} />}
           <DropFurniture />
           <color attach="background" args={["#e8eae6"]} />
-          <ambientLight intensity={realistic ? 0.45 : 1.1} />
-          <hemisphereLight args={["#f9f6ef", "#8b9b8a", 1]} />
+          <ambientLight intensity={realistic ? light.ambient : 1.1} />
+          <hemisphereLight
+            args={[
+              realistic ? light.sky : "#f9f6ef",
+              realistic ? light.ground : "#8b9b8a",
+              realistic ? light.hemisphere : 1,
+            ]}
+          />
+          {realistic && (
+            <directionalLight
+              position={[bounds.x - 6, 5, bounds.y - 4]}
+              color={light.sky}
+              intensity={light.fill}
+            />
+          )}
           <directionalLight
-            position={[3, 12, 5]}
-            intensity={realistic ? 2.5 : 2}
+            position={[
+              bounds.x + 3,
+              lighting === "warm" ? 6 : 12,
+              bounds.y + 5,
+            ]}
+            color={realistic ? light.color : "#ffffff"}
+            intensity={realistic ? light.sun : 2}
             castShadow
             shadow-mapSize={quality ? 2048 : 1024}
-            shadow-camera-left={-12}
-            shadow-camera-right={12}
-            shadow-camera-top={12}
-            shadow-camera-bottom={-12}
+            shadow-camera-left={-Math.max(12, bounds.span)}
+            shadow-camera-right={Math.max(12, bounds.span)}
+            shadow-camera-top={Math.max(12, bounds.span)}
+            shadow-camera-bottom={-Math.max(12, bounds.span)}
+            shadow-normalBias={0.025}
+            shadow-bias={-0.00015}
+            shadow-radius={quality ? 4 : 2}
           />
           <Grid
             infiniteGrid
@@ -952,10 +1026,11 @@ export default function Scene({
           ))}
           {(quality || realistic) && (
             <ContactShadows
-              position={[4, 0.005, 3]}
-              scale={20}
-              opacity={0.3}
-              blur={2}
+              position={[bounds.x, 0.005, bounds.y]}
+              scale={Math.max(12, bounds.span * 1.8)}
+              resolution={quality ? 512 : 256}
+              opacity={realistic ? 0.4 : 0.3}
+              blur={2.5}
               far={5}
             />
           )}{" "}
