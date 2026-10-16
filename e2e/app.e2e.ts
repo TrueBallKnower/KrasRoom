@@ -854,6 +854,9 @@ test("navigation 3D : clic droit sûr, caméra conservée, vues et centrage", as
   await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
   await page.locator(".plan-svg g[data-item] > rect").click();
   await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  // The canvas is remounted here. Wait for its first rendered frame before
+  // sending camera commands; the stored snapshot still belongs to the old view.
+  await canvas.screenshot();
   await page.keyboard.press("f");
   await expect
     .poll(async () => {
