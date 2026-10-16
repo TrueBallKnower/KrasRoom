@@ -11,7 +11,8 @@
     "test:e2e": "playwright test",
     "test:webkit:e2e": "playwright test --config playwright.webkit.config.ts",
     "format": "prettier --write src e2e *.ts *.json .github/workflows/deploy.yml",
-    "test:cloud:e2e": "playwright test --config playwright.cloud.config.ts"
+    "test:cloud:e2e": "playwright test --config playwright.cloud.config.ts",
+    "test:cloud:webkit:e2e": "playwright test --config playwright.cloud.webkit.config.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.0",

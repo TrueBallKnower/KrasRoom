@@ -1,6 +1,7 @@
 import "fake-indexeddb/auto";
 import { zipSync, unzipSync } from "fflate";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { openDB } from "idb";
 import { demo } from "./model";
 import {
   saveProject,
@@ -8,6 +9,7 @@ import {
   removeProject,
   assetPut,
   assetGet,
+  LOCAL_CHUNK_SIZE,
   exportProject,
   importProject,
   libraryPut,
@@ -93,5 +95,86 @@ describe("Persistance et sauvegardes portables", () => {
     expect((await library()).find((v) => v.id === i.id)).toEqual(i);
     await libraryDelete(i.id);
     expect((await library()).find((v) => v.id === i.id)).toBeUndefined();
+  });
+});
+
+describe("Stockage binaire compatible WebKit", () => {
+  it("stocke des ArrayBuffer, conserve les octets et le type MIME sur plusieurs fragments", async () => {
+    const bytes = new Uint8Array(LOCAL_CHUNK_SIZE + 37);
+    bytes[0] = 23;
+    bytes[LOCAL_CHUNK_SIZE - 1] = 42;
+    bytes[LOCAL_CHUNK_SIZE] = 81;
+    bytes[bytes.length - 1] = 199;
+    const id = await assetPut(new Blob([bytes], { type: "model/gltf-binary" }));
+    const d = await openDB("roomora", 1),
+      record = await d.get("assets", id);
+    expect(record.format).toBe("krasroom-bytes-v1");
+    expect(record.parts).toBe(2);
+    expect(
+      await d.get("assets", ["binary-part", id, record.generation, 0]),
+    ).toBeInstanceOf(ArrayBuffer);
+    d.close();
+    const loaded = (await assetGet(id))!;
+    expect(loaded.type).toBe("model/gltf-binary");
+    expect([
+      ...new Uint8Array(
+        await crypto.subtle.digest("SHA-256", await loaded.arrayBuffer()),
+      ),
+    ]).toEqual([
+      ...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+    ]);
+  });
+  it("lit les anciens Blobs et permet de les remplacer sans migration ni perte", async () => {
+    const id = crypto.randomUUID(),
+      d = await openDB("roomora", 1);
+    await d.put(
+      "assets",
+      new Blob(["ancien meuble"], { type: "model/gltf+json" }),
+      id,
+    );
+    d.close();
+    expect(await (await assetGet(id))!.text()).toBe("ancien meuble");
+    await assetPut(
+      new Blob(["nouveau meuble"], { type: "model/gltf+json" }),
+      id,
+    );
+    expect(await (await assetGet(id))!.text()).toBe("nouveau meuble");
+  });
+  it("conserve le fichier précédent et nettoie les nouveaux fragments si l’écriture échoue", async () => {
+    const id = await assetPut(new Blob(["à conserver"]));
+    const original = IDBObjectStore.prototype.put;
+    let writes = 0;
+    const spy = vi
+      .spyOn(IDBObjectStore.prototype, "put")
+      .mockImplementation(function (this: IDBObjectStore, value, key) {
+        if (value instanceof ArrayBuffer && ++writes === 2)
+          throw new DOMException(
+            "storage quota exceeded",
+            "QuotaExceededError",
+          );
+        return original.call(this, value, key!);
+      });
+    try {
+      await expect(
+        assetPut(new Blob([new Uint8Array(LOCAL_CHUNK_SIZE + 5)]), id),
+      ).rejects.toThrow("stockage local de cet appareil est plein");
+      expect(await (await assetGet(id))!.text()).toBe("à conserver");
+      const d = await openDB("roomora", 1),
+        keys = await d.getAllKeys("assets");
+      expect(
+        keys.filter((key) => Array.isArray(key) && key[1] === id),
+      ).toHaveLength(1);
+      d.close();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it("restaure aussi une ressource vide sans fragment", async () => {
+    const id = await assetPut(
+      new Blob([], { type: "application/octet-stream" }),
+    );
+    const loaded = (await assetGet(id))!;
+    expect(loaded.size).toBe(0);
+    expect(loaded.type).toBe("application/octet-stream");
   });
 });

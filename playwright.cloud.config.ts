@@ -5,7 +5,7 @@ const outDir = process.env.ROOMORA_CLOUD_TEST_BASE_URL
   : mkdtempSync("/tmp/roomora-cloud-test-");
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "**/cloud.flow.ts",
+  testMatch: ["**/cloud.flow.ts", "**/cloudStorage.flow.ts"],
   workers: 1,
   use: {
     baseURL: process.env.ROOMORA_CLOUD_TEST_BASE_URL || "http://127.0.0.1:5180",

@@ -39,6 +39,7 @@ export default function AccountPanel({
     try {
       await f();
     } catch (e) {
+      setMessage("");
       setError(cloudError(e));
     } finally {
       setWorking(false);

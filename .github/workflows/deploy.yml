@@ -23,6 +23,7 @@ jobs:
       - run: npm run test:e2e
       - run: npm run test:webkit:e2e
       - run: npm run test:cloud:e2e
+      - run: npm run test:cloud:webkit:e2e
       - run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}

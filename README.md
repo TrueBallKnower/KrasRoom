@@ -160,3 +160,7 @@ Ouvrir la même adresse dans le navigateur ; aucun abonnement ni application à 
 - Les fichiers se choisissent dans Fichiers/Téléchargements. Les sauvegardes locales restent propres au navigateur ; utiliser le même compte et envoyer l’appartement en ligne pour le retrouver sur d’autres appareils.
 
 Les tests tactiles automatisés utilisent Chromium avec de vrais événements tactiles en émulation de téléphone et de tablette. Un parcours téléphone est également exécuté avec WebKit dans GitHub Actions (`npm run test:webkit:e2e`), pour vérifier l’interface sur le moteur Safari. Ces tests ne remplacent pas un contrôle sur appareils physiques iOS/Android. Le téléchargement local de WebKit est bloqué dans l’environnement de développement.
+
+### Stockage des fichiers sur Safari/iOS
+
+Les nouvelles ressources sont conservées dans IndexedDB sous forme de fragments `ArrayBuffer` de 4 Mo et reconstruites en `Blob` à la lecture. Cela évite l’erreur WebKit « Error preparing Blob/File data to be stored in object store » sur les fichiers issus d’un téléchargement. Les anciens Blobs restent lisibles, sans changer la version de la base ni le format des exports. Le manifeste n’est remplacé qu’après l’écriture complète des fragments ; un échec conserve la ressource précédente. `npm run test:cloud:webkit:e2e` vérifie la récupération d’un modèle depuis un service simulé sur WebKit avec le refus des écritures Blob activé.
