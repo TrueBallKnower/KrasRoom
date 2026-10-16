@@ -89,6 +89,8 @@ test("un téléphone refusant les Blobs IndexedDB récupère réellement les fic
         { exact: true },
       ),
     ).toBeVisible();
+    for (const bytes of service.files.values())
+      expect(Buffer.compare(bytes, Buffer.from(model)), "Le service reçoit le modèle intact").toBe(0);
     await login(phone);
     try {
       await expect(phone.locator("footer")).toContainText("1 meubles", {
