@@ -3,6 +3,8 @@ export type CameraAction = "fit" | "focus" | "top" | "front" | "side" | "iso";
 export const useNavigation = create<{
   mode: "orbit" | "pan";
   space: boolean;
+  placement: "floor" | "height" | "wall";
+  setPlacement: (placement: "floor" | "height" | "wall") => void;
   command: { action: CameraAction; serial: number };
   setMode: (mode: "orbit" | "pan") => void;
   setSpace: (space: boolean) => void;
@@ -10,6 +12,8 @@ export const useNavigation = create<{
 }>((set) => ({
   mode: "orbit",
   space: false,
+  placement: "floor",
+  setPlacement: (placement) => set({ placement, mode: "orbit" }),
   command: { action: "fit", serial: 0 },
   setMode: (mode) => set({ mode }),
   setSpace: (space) => set({ space }),

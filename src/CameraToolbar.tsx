@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { MousePointer2, Hand, Scan, Focus, Box } from "lucide-react";
+import { useStore } from "./store";
 import { useNavigation } from "./navigation";
 export default function CameraToolbar() {
-  const { mode, setMode, issue, space } = useNavigation();
+  const { mode, setMode, issue, space, placement, setPlacement } =
+    useNavigation();
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     const editing = (e: KeyboardEvent) =>
@@ -18,6 +20,32 @@ export default function CameraToolbar() {
         document.pointerLockElement
       )
         return;
+      if (
+        ["ArrowUp", "ArrowDown"].includes(e.key) &&
+        useNavigation.getState().placement === "height"
+      ) {
+        const store = useStore.getState();
+        if (store.project.items.some((i) => i.id === store.selected)) {
+          e.preventDefault();
+          store.change((p) => {
+            const i = p.items.find((i) => i.id === store.selected)!;
+            i.elevation = Math.max(
+              0,
+              Math.round(
+                ((i.elevation || 0) +
+                  (e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 0.01 : 0.05)) *
+                  100,
+              ) / 100,
+            );
+          });
+        }
+      }
+      if (!e.repeat && ["m", "h"].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+        const nav = useNavigation.getState();
+        const requested = e.key.toLowerCase() === "m" ? "wall" : "height";
+        nav.setPlacement(nav.placement === requested ? "floor" : requested);
+      }
       if (e.code === "Space") {
         e.preventDefault();
         useNavigation.getState().setSpace(true);
@@ -86,6 +114,36 @@ export default function CameraToolbar() {
             Centrer · F
           </button>
         </div>
+        <div className="camera-tools" aria-label="Déplacement des objets">
+          <button
+            aria-pressed={placement === "floor"}
+            onClick={() => setPlacement("floor")}
+          >
+            Au sol
+          </button>
+          <button
+            title="Glisser un objet de haut en bas · H"
+            aria-pressed={placement === "height"}
+            onClick={() => setPlacement("height")}
+          >
+            Hauteur · H
+          </button>
+          <button
+            title="Glisser un objet sur un mur · M"
+            aria-pressed={placement === "wall"}
+            onClick={() => setPlacement("wall")}
+          >
+            Fixer au mur · M
+          </button>
+        </div>
+        {placement !== "floor" && (
+          <p className="small">
+            {placement === "wall"
+              ? "Glissez le meuble vers un mur : position et hauteur suivent la souris."
+              : "Glissez le meuble de haut en bas. Flèches ↑ ↓ : 5 cm ; Maj : 1 cm."}{" "}
+            Échap : annuler.
+          </p>
+        )}
         <div className="camera-cube" aria-label="Vues prédéfinies">
           <button onClick={() => issue("top")}>Dessus</button>
           <button onClick={() => issue("front")}>Face</button>

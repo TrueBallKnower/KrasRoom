@@ -1,3 +1,4 @@
+import { useNavigation } from "./navigation";
 import {
   useCallback,
   useEffect,
@@ -1092,6 +1093,28 @@ export default function App() {
               )}
               <div className="property-section">
                 <h4>Position et orientation</h4>
+                <div className="workshop-actions">
+                  <button
+                    onClick={() => {
+                      setView("3d");
+                      useNavigation.getState().setPlacement("height");
+                    }}
+                  >
+                    Régler la hauteur · H
+                  </button>
+                  <button
+                    onClick={() => {
+                      setView("3d");
+                      useNavigation.getState().setPlacement("wall");
+                    }}
+                  >
+                    Placer sur un mur · M
+                  </button>
+                </div>
+                <p className="small">
+                  En vue 3D : H pour monter ou descendre, M pour fixer au mur.
+                  Appuyez à nouveau pour revenir au déplacement au sol.
+                </p>
                 {num("Position X", item.x, (v) => editItem("x", v), -1000)}
                 {num("Position Y", item.y, (v) => editItem("y", v), -1000)}
                 {num("Élévation au-dessus du sol", item.elevation || 0, (v) =>

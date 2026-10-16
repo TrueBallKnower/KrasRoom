@@ -493,6 +493,66 @@ test("placement et déplacement directs dans la vue 3D, rotation et visite régl
   await expect(page.getByLabel("Rotation", { exact: true })).toHaveValue("15");
   await page.getByTitle("Annuler · ⌘Z").click();
   await expect(page.getByLabel("Rotation", { exact: true })).toHaveValue("0");
+  await page.keyboard.press("h");
+  await expect(
+    page.getByRole("button", { name: "Hauteur · H", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("ArrowUp");
+  await expect(
+    page.getByLabel("Élévation au-dessus du sol", { exact: true }),
+  ).toHaveValue("0.05");
+  await page.keyboard.press("Shift+ArrowUp");
+  await expect(
+    page.getByLabel("Élévation au-dessus du sol", { exact: true }),
+  ).toHaveValue("0.06");
+  const px = Number(
+    await page.getByLabel("Position X", { exact: true }).inputValue(),
+  );
+  const py = Number(
+    await page.getByLabel("Position Y", { exact: true }).inputValue(),
+  );
+  const heightBox = (await canvas.boundingBox())!;
+  camera.aspect = heightBox.width / heightBox.height;
+  camera.updateProjectionMatrix();
+  const snapshot = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) =>
+      k.startsWith("roomora-camera-"),
+    );
+    return key ? JSON.parse(localStorage.getItem(key)!) : null;
+  });
+  if (snapshot) {
+    camera.position.fromArray(snapshot.position);
+    camera.lookAt(new Vector3(...snapshot.target));
+    camera.updateMatrixWorld();
+  }
+  const raised = new Vector3(px, 0.79, py).project(camera);
+  const hx = heightBox.x + ((raised.x + 1) * heightBox.width) / 2,
+    hy = heightBox.y + ((1 - raised.y) * heightBox.height) / 2;
+  await page.mouse.move(hx, hy);
+  await page.mouse.down();
+  await page.mouse.move(hx, hy - 45, { steps: 10 });
+  await page.mouse.up();
+  await expect(
+    page.getByLabel("Élévation au-dessus du sol", { exact: true }),
+  ).not.toHaveValue("0.06");
+  await expect(page.getByLabel("Position X", { exact: true })).toHaveValue(
+    String(px),
+  );
+  await expect(page.getByLabel("Position Y", { exact: true })).toHaveValue(
+    String(py),
+  );
+  await page.getByTitle("Annuler · ⌘Z").click();
+  await expect(
+    page.getByLabel("Élévation au-dessus du sol", { exact: true }),
+  ).toHaveValue("0.06");
+  await page.keyboard.press("m");
+  await expect(
+    page.getByRole("button", { name: "Fixer au mur · M", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("m");
+  await expect(
+    page.getByRole("button", { name: "Au sol", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Visite", exact: true }).click();
   await page
     .getByLabel("Hauteur des yeux", { exact: true })
@@ -961,4 +1021,83 @@ test("proportions, unités et dissociation d’un ensemble restent sauvegardable
       exact: true,
     }),
   ).toBeVisible();
+});
+
+test("un écran glisse sur un mur à la hauteur choisie et reste sauvegardé", async ({
+  page,
+}) => {
+  const { blank, furniture, catalog } = await import("../src/model");
+  const { zipSync, strToU8 } = await import("fflate");
+  const p = blank();
+  p.walls = [
+    {
+      id: "support",
+      a: { x: 0, y: 0 },
+      b: { x: 6, y: 0 },
+      height: 2.6,
+      thickness: 0.2,
+      color: "#ffffff",
+      openings: [],
+    },
+  ];
+  p.items = [
+    {
+      ...furniture(catalog[0]),
+      name: "Écran mural",
+      kind: "tv",
+      x: 3,
+      y: 2,
+      width: 1.2,
+      depth: 0.08,
+      height: 0.7,
+    },
+  ];
+  await page.goto("./");
+  await page.locator('input[accept=".zip"]').setInputFiles({
+    name: "ecran.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from(
+      zipSync({ "project.json": strToU8(JSON.stringify(p)) }),
+    ),
+  });
+  await expect(page.locator("footer")).toContainText("1 meubles");
+  await page.locator('g[data-item="true"]').last().click({ force: true });
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeVisible();
+  await canvas.screenshot();
+  const box = (await canvas.boundingBox())!;
+  const { PerspectiveCamera, Vector3 } = await import("three");
+  // The wall spans x=0..6 and the object extends to z=2.04.
+  const camera = new PerspectiveCamera(42, box.width / box.height, 0.05, 500);
+  camera.position.set(3 + 6 * 0.9, 6 * 0.95, 1.02 + 6 * 1.1);
+  camera.lookAt(3, 0, 1.02);
+  camera.updateMatrixWorld();
+  const point = (v: InstanceType<typeof Vector3>) => {
+    const q = v.project(camera);
+    return {
+      x: box.x + ((q.x + 1) * box.width) / 2,
+      y: box.y + ((1 - q.y) * box.height) / 2,
+    };
+  };
+  await page.keyboard.press("m");
+  const start = point(new Vector3(3, 0.4, 2)),
+    end = point(new Vector3(3, 1.6, 0.1));
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 20 });
+  await page.mouse.up();
+  await expect(page.getByLabel("Position Y", { exact: true })).toHaveValue(
+    "0.145",
+  );
+  await expect(
+    page.getByLabel("Élévation au-dessus du sol", { exact: true }),
+  ).toHaveValue("1.25");
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+  await page.locator('g[data-item="true"]').last().click({ force: true });
+  await expect(
+    page.getByLabel("Élévation au-dessus du sol", { exact: true }),
+  ).toHaveValue("1.25");
 });

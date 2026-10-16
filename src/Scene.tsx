@@ -40,6 +40,7 @@ import {
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { surfaceTexture } from "./materials";
 import { magneticPlacement, type AlignmentGuide } from "./placement";
+import { wallPlacement } from "./wallPlacement";
 import { wallOutline, visitStart } from "./spatial";
 import NavigationCamera from "./NavigationCamera";
 import { useNavigation } from "./navigation";
@@ -629,13 +630,17 @@ export default function Scene({
       ),
     [p, showCollisions],
   );
-  const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(
-    null,
-  );
+  const [drag, setDrag] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    elevation: number;
+    rotation: number;
+  } | null>(null);
   const draggedItem = drag ? p.items.find((i) => i.id === drag.id) : undefined;
   const previewCollision =
     showCollisions && drag && draggedItem
-      ? collides({ ...draggedItem, x: drag.x, y: drag.y }, p)
+      ? collides({ ...draggedItem, ...drag }, p)
       : false;
   const [hovered, setHovered] = useState(false);
   const [guides, setGuides] = useState<AlignmentGuide[]>([]);
@@ -647,8 +652,13 @@ export default function Scene({
     dy: number;
     sx: number;
     sy: number;
+    elevation: number;
+    rotation: number;
+    plane: Plane;
+    startHeight: number;
+    placement: "floor" | "height" | "wall";
   } | null>(null);
-  const { mode, space } = useNavigation();
+  const { mode, space, placement: placementMode } = useNavigation();
   const panning = mode === "pan" || space;
   const orbit = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   function cancelDrag() {
@@ -672,14 +682,43 @@ export default function Scene({
   useEffect(() => {
     if (panning) cancelDrag();
   }, [panning]);
+  useEffect(() => {
+    cancelDrag();
+  }, [placementMode, p.id]);
   const ground = useMemo(() => new Plane(new Vector3(0, 1, 0), 0), []);
   function move(e: ThreeEvent<PointerEvent>) {
     const g = gesture.current;
     if (!g) return;
     e.stopPropagation();
     if (!drag && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 5) return;
-    const q = e.ray.intersectPlane(ground, new Vector3());
+    const source = p.items.find((i) => i.id === g.id);
+    if (!source) return;
+    if (g.placement === "wall") {
+      const placed = wallPlacement(source, p.walls, e.ray, snap);
+      if (placed)
+        setDrag({
+          id: source.id,
+          x: placed.x,
+          y: placed.y,
+          elevation: placed.elevation || 0,
+          rotation: placed.rotation,
+        });
+      setGuides([]);
+      return;
+    }
+    const q = e.ray.intersectPlane(g.plane, new Vector3());
     if (!q) return;
+    if (g.placement === "height") {
+      const height = Math.max(0, g.elevation + q.y - g.startHeight);
+      setDrag({
+        id: g.id,
+        x: g.x,
+        y: g.y,
+        elevation: snap ? Math.round(height * 20) / 20 : height,
+        rotation: g.rotation,
+      });
+      return;
+    }
     const candidate = {
       ...p.items.find((i) => i.id === g.id)!,
       x: q.x - g.dx,
@@ -688,7 +727,13 @@ export default function Scene({
     const placement = snap
       ? magneticPlacement(candidate, p)
       : { item: candidate, guides: [] };
-    setDrag({ id: g.id, x: placement.item.x, y: placement.item.y });
+    setDrag({
+      id: g.id,
+      x: placement.item.x,
+      y: placement.item.y,
+      elevation: g.elevation,
+      rotation: g.rotation,
+    });
     setGuides(placement.guides);
   }
   function finish(e: ThreeEvent<PointerEvent>) {
@@ -697,13 +742,18 @@ export default function Scene({
     e.stopPropagation();
     if (
       drag &&
-      (Math.abs(drag.x - g.x) > 0.0001 || Math.abs(drag.y - g.y) > 0.0001)
+      (Math.abs(drag.x - g.x) > 0.0001 ||
+        Math.abs(drag.y - g.y) > 0.0001 ||
+        Math.abs(drag.elevation - g.elevation) > 0.0001 ||
+        Math.abs(drag.rotation - g.rotation) > 0.0001)
     )
       change((p) => {
         const i = p.items.find((i) => i.id === g.id);
         if (i) {
           i.x = drag.x;
           i.y = drag.y;
+          i.elevation = drag.elevation;
+          i.rotation = drag.rotation;
         }
       });
     cancelDrag();
@@ -784,10 +834,16 @@ export default function Scene({
                   key={i.id}
                   position={[
                     drag?.id === i.id ? drag.x : i.x,
-                    i.elevation || 0,
+                    drag?.id === i.id ? drag.elevation : i.elevation || 0,
                     drag?.id === i.id ? drag.y : i.y,
                   ]}
-                  rotation={[0, (-i.rotation * Math.PI) / 180, 0]}
+                  rotation={[
+                    0,
+                    (-(drag?.id === i.id ? drag.rotation : i.rotation) *
+                      Math.PI) /
+                      180,
+                    0,
+                  ]}
                   onClick={(e) => {
                     e.stopPropagation();
                     select(i.id);
@@ -812,7 +868,18 @@ export default function Scene({
                       return;
                     e.stopPropagation();
                     select(i.id);
-                    const q = e.ray.intersectPlane(ground, new Vector3());
+                    const plane =
+                      placementMode === "height"
+                        ? new Plane().setFromNormalAndCoplanarPoint(
+                            new Vector3(
+                              e.ray.direction.x,
+                              0,
+                              e.ray.direction.z,
+                            ).normalize(),
+                            new Vector3(i.x, i.elevation || 0, i.y),
+                          )
+                        : ground;
+                    const q = e.ray.intersectPlane(plane, new Vector3());
                     if (!q) return;
                     if (orbit.current) orbit.current.enabled = false;
                     gesture.current = {
@@ -823,6 +890,11 @@ export default function Scene({
                       dy: q.z - i.y,
                       sx: e.clientX,
                       sy: e.clientY,
+                      elevation: i.elevation || 0,
+                      rotation: i.rotation,
+                      plane,
+                      startHeight: q.y,
+                      placement: placementMode,
                     };
                     (e.target as Element).setPointerCapture(e.pointerId);
                   }}
