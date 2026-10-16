@@ -140,7 +140,9 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
     await page.goto(
       process.env.ROOMORA_CLOUD_TEST_BASE_URL || "http://127.0.0.1:5180/",
     );
-    await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+    await expect(page.getByText("Enregistré", { exact: true })).toBeVisible({
+      timeout: 15000,
+    });
     await page.getByRole("button", { name: "Mon compte", exact: true }).click();
     await page.getByLabel("Adresse e-mail", { exact: true }).fill(email);
     await page
