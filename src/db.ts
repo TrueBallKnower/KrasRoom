@@ -1,3 +1,8 @@
+import {
+  checkSize,
+  PROJECT_ARCHIVE_LIMIT,
+  PROJECT_EXPANDED_LIMIT,
+} from "./importLimits";
 import { openDB } from "idb";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { validateProject, type Project, type Item } from "./model";
@@ -43,24 +48,27 @@ export async function exportProject(p: Project) {
       Boolean,
     ) as string[],
   );
+  let expanded = files["project.json"].byteLength;
   for (const id of ids) {
     const b = await assetGet(id);
     if (!b) throw Error("Ressource manquante : " + id);
+    expanded += b.size;
+    checkSize(expanded, PROJECT_EXPANDED_LIMIT, "Projet à exporter");
     files["assets/" + id] = new Uint8Array(await b.arrayBuffer());
   }
-  return new Blob([zipSync(files) as Uint8Array<ArrayBuffer>], {
+  const archive = new Blob([zipSync(files) as Uint8Array<ArrayBuffer>], {
     type: "application/zip",
   });
+  checkSize(archive.size, PROJECT_ARCHIVE_LIMIT, "Sauvegarde à exporter");
+  return archive;
 }
 export async function importProject(blob: Blob) {
-  if (blob.size > 200 * 1024 * 1024)
-    throw Error("Archive trop volumineuse (200 Mo maximum).");
+  checkSize(blob.size, PROJECT_ARCHIVE_LIMIT, "Archive");
   let expanded = 0;
   const files = unzipSync(new Uint8Array(await blob.arrayBuffer()), {
     filter(file) {
       expanded += file.originalSize;
-      if (expanded > 300 * 1024 * 1024)
-        throw Error("Archive décompressée trop volumineuse (300 Mo maximum).");
+      checkSize(expanded, PROJECT_EXPANDED_LIMIT, "Archive décompressée");
       return (
         !file.name.startsWith("__MACOSX/") &&
         (file.name === "project.json" ||

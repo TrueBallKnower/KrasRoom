@@ -1937,7 +1937,7 @@ export default function App() {
                         : "Importer un fichier 3D ou un ZIP"}
                     </strong>
                     <p>
-                      Déposez un GLB ou un ZIP glTF avec ses textures · 50 Mo
+                      Déposez un GLB ou un ZIP glTF avec ses textures · 100 Mo
                       max.
                     </p>
                   </div>

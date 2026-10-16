@@ -1,11 +1,15 @@
+import {
+  checkSize,
+  MODEL_FILE_LIMIT,
+  PREPARED_MODEL_LIMIT,
+} from "./importLimits";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import worker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { prepareFurnitureFile, prepareFurnitureFolder } from "./modelBundle";
 import { assetPut } from "./db";
 import { uid, type Item } from "./model";
 export async function parseModel(blob: Blob) {
-  if (blob.size > 50 * 1024 * 1024)
-    throw Error("Modèle trop volumineux : maximum 50 Mo.");
+  checkSize(blob.size, PREPARED_MODEL_LIMIT, "Modèle préparé");
   const bytes = await blob.arrayBuffer();
   const head = new Uint8Array(bytes);
   let json;
@@ -159,7 +163,7 @@ export async function importURL(raw: string, report: ImportReport = () => {}) {
     );
   let response;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    response = await fetch(url, { signal: AbortSignal.timeout(180000) });
   } catch {
     throw Error(
       "Téléchargement impossible : le site doit autoriser CORS. Téléchargez le fichier puis importez-le localement.",
@@ -167,8 +171,14 @@ export async function importURL(raw: string, report: ImportReport = () => {}) {
   }
   if (!response.ok)
     throw Error("Téléchargement refusé (HTTP " + response.status + ").");
-  if (Number(response.headers.get("content-length")) > 50 * 1024 * 1024)
-    throw Error("Fichier trop volumineux.");
+  if (Number(response.headers.get("content-length")) > MODEL_FILE_LIMIT) {
+    await response.body?.cancel();
+    checkSize(
+      Number(response.headers.get("content-length")),
+      MODEL_FILE_LIMIT,
+      "Fichier",
+    );
+  }
   let loaded = 0;
   const total = Number(response.headers.get("content-length")) || undefined;
   const reader = response.body?.getReader();
@@ -179,8 +189,7 @@ export async function importURL(raw: string, report: ImportReport = () => {}) {
         const { value, done } = await reader.read();
         if (done) break;
         loaded += value.byteLength;
-        if (loaded > 50 * 1024 * 1024)
-          throw Error("Fichier trop volumineux (50 Mo maximum).");
+        checkSize(loaded, MODEL_FILE_LIMIT, "Fichier");
         chunks.push(value as Uint8Array<ArrayBuffer>);
         report(
           `Téléchargement : ${(loaded / 1024 / 1024).toFixed(1)} Mo${total ? ` / ${(total / 1024 / 1024).toFixed(1)} Mo` : ""}`,
@@ -189,9 +198,12 @@ export async function importURL(raw: string, report: ImportReport = () => {}) {
     } catch (e) {
       await reader.cancel();
       throw e;
+    } finally {
+      reader.releaseLock();
     }
   }
   const blob = reader ? new Blob(chunks) : await response.blob();
+  checkSize(blob.size, MODEL_FILE_LIMIT, "Fichier");
   return importModel(
     blob,
     decodeURIComponent(url.pathname.split("/").pop()!),

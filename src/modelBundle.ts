@@ -1,5 +1,10 @@
 import { unzipSync, strFromU8 } from "fflate";
-const MAX = 100 * 1024 * 1024;
+import {
+  checkSize,
+  MODEL_FILE_LIMIT,
+  PREPARED_MODEL_LIMIT,
+  FURNITURE_EXPANDED_LIMIT,
+} from "./importLimits";
 const mime = (path: string) =>
   /\.png$/i.test(path)
     ? "image/png"
@@ -48,24 +53,23 @@ export function embedGLTF(
     resource.uri = dataURI(bytes, resource.mimeType || mime(key));
   }
   const blob = new Blob([JSON.stringify(json)], { type: "model/gltf+json" });
-  if (blob.size > 50 * 1024 * 1024)
-    throw Error(
-      "Modèle avec textures trop volumineux (50 Mo maximum après préparation). Choisissez des textures moins grandes.",
-    );
+  checkSize(
+    blob.size,
+    PREPARED_MODEL_LIMIT,
+    "Modèle avec textures après préparation",
+  );
   return blob;
 }
 export async function prepareFurnitureFile(
   file: File,
 ): Promise<{ blob: Blob; name: string }> {
-  if (file.size > 50 * 1024 * 1024)
-    throw Error("Fichier trop volumineux (50 Mo maximum).");
+  checkSize(file.size, MODEL_FILE_LIMIT, "Fichier");
   if (!/\.zip$/i.test(file.name)) return { blob: file, name: file.name };
   let expanded = 0;
   const files = unzipSync(new Uint8Array(await file.arrayBuffer()), {
     filter(f) {
       expanded += f.originalSize;
-      if (expanded > MAX)
-        throw Error("Archive décompressée trop volumineuse (100 Mo maximum).");
+      checkSize(expanded, FURNITURE_EXPANDED_LIMIT, "ZIP décompressé");
       return !f.name.startsWith("__MACOSX/") && !f.name.endsWith("/");
     },
   });
@@ -81,6 +85,8 @@ export async function prepareFurnitureFile(
         : "Aucun modèle GLB ou glTF trouvé dans ce ZIP. Sur le site source, choisissez le téléchargement glTF ou GLB.",
     );
   const path = paths[0];
+  if (/\.glb$/i.test(path))
+    checkSize(files[path].byteLength, MODEL_FILE_LIMIT, "Modèle GLB");
   return {
     blob: /\.glb$/i.test(path)
       ? new Blob([files[path] as Uint8Array<ArrayBuffer>], {
@@ -91,8 +97,11 @@ export async function prepareFurnitureFile(
   };
 }
 export async function prepareFurnitureFolder(input: File[]) {
-  if (input.reduce((n, f) => n + f.size, 0) > 50 * 1024 * 1024)
-    throw Error("Dossier trop volumineux (50 Mo maximum).");
+  checkSize(
+    input.reduce((n, f) => n + f.size, 0),
+    MODEL_FILE_LIMIT,
+    "Dossier",
+  );
   const files: Record<string, Uint8Array> = {};
   for (const f of input)
     files[f.webkitRelativePath || f.name] = new Uint8Array(
@@ -104,6 +113,8 @@ export async function prepareFurnitureFolder(input: File[]) {
       "Sélectionnez le dossier complet contenant un seul meuble GLB ou glTF et ses textures.",
     );
   const path = paths[0];
+  if (/\.glb$/i.test(path))
+    checkSize(files[path].byteLength, MODEL_FILE_LIMIT, "Modèle GLB");
   return {
     blob: /\.glb$/i.test(path)
       ? new Blob([files[path] as Uint8Array<ArrayBuffer>])

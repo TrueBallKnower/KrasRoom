@@ -1337,3 +1337,96 @@ test("la visite immersive entre et sort du plein écran natif", async ({
   await page.evaluate(() => document.exitFullscreen());
   await expect(page.locator(".app")).not.toHaveClass(/immersive-visit/);
 });
+
+test("importe réellement un GLB de 100 Mo, le rend et restaure ses octets depuis un ZIP", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const { writeFile, unlink } = await import("node:fs/promises");
+  const size = 100 * 1024 * 1024;
+  const model = {
+    asset: { version: "2.0" },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    buffers: [{ byteLength: 0 }],
+    bufferViews: [{ buffer: 0, byteLength: 36 }],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+        min: [0, 0, 0],
+        max: [1, 1, 1],
+      },
+    ],
+  };
+  let json = JSON.stringify(model),
+    length = 0;
+  for (let i = 0; i < 4; i++) {
+    length = Math.ceil(Buffer.byteLength(json) / 4) * 4;
+    model.buffers[0].byteLength = size - 28 - length;
+    json = JSON.stringify(model);
+  }
+  length = Math.ceil(Buffer.byteLength(json) / 4) * 4;
+  const glb = Buffer.alloc(size);
+  glb.writeUInt32LE(0x46546c67, 0);
+  glb.writeUInt32LE(2, 4);
+  glb.writeUInt32LE(size, 8);
+  glb.writeUInt32LE(length, 12);
+  glb.writeUInt32LE(0x4e4f534a, 16);
+  glb.fill(32, 20, 20 + length);
+  glb.write(json, 20, "utf8");
+  glb.writeUInt32LE(size - 28 - length, 20 + length);
+  glb.writeUInt32LE(0x004e4942, 24 + length);
+  Buffer.from(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 1]).buffer).copy(
+    glb,
+    28 + length,
+  );
+  glb[size - 1] = 123;
+  const path = `/tmp/roomora-100mo-${Date.now()}.glb`;
+  await writeFile(path, glb);
+  try {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto("./");
+    await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
+    await page.locator('input[accept=".glb,.gltf,.zip"]').setInputFiles(path);
+    await expect(page.getByLabel("Nom", { exact: true })).toHaveValue(
+      /roomora-100mo/,
+    );
+    await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+    await expect(page.locator("canvas")).toBeVisible();
+    await page.locator("canvas").screenshot();
+    const dl = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Exporter", exact: true }).click();
+    const stream = await (await dl).createReadStream(),
+      chunks = [];
+    for await (const c of stream!) chunks.push(c);
+    const zip = Buffer.concat(chunks),
+      { unzipSync, strFromU8 } = await import("fflate"),
+      files = unzipSync(zip);
+    const p = JSON.parse(strFromU8(files["project.json"])),
+      item = p.items.find((i: { name: string }) =>
+        i.name.startsWith("roomora-100mo"),
+      );
+    expect(files["assets/" + item.asset].byteLength).toBe(size);
+    expect(files["assets/" + item.asset][size - 1]).toBe(123);
+    await page.locator('input[accept=".zip"]').setInputFiles({
+      name: "large.roomora.zip",
+      mimeType: "application/zip",
+      buffer: zip,
+    });
+    await expect(page.locator("footer")).toContainText(
+      `${p.items.length} meubles`,
+    );
+    await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+    await expect(page.locator("canvas")).toBeVisible();
+    await page.locator("canvas").screenshot();
+    expect(errors).toEqual([]);
+  } finally {
+    await unlink(path);
+  }
+});
