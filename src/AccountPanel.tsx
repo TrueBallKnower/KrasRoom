@@ -58,7 +58,7 @@ export default function AccountPanel({
           l’autre ordinateur.
         </p>
         <a
-          href="https://github.com/TrueBallKnower/Roomora/blob/main/supabase/INSTALLATION.md"
+          href="https://github.com/TrueBallKnower/KrasRoom/blob/main/supabase/INSTALLATION.md"
           target="_blank"
           rel="noreferrer"
         >

@@ -1,6 +1,6 @@
 # KrasRoom
 
-Anciennement Roomora. Le dépôt et l’adresse GitHub Pages restent `TrueBallKnower/Roomora` et `https://trueballknower.github.io/Roomora/`. Les identifiants de stockage, les comptes et le format `.roomora.zip` sont conservés pour retrouver les projets et sauvegardes existants.
+Anciennement Roomora. Le dépôt et l’adresse GitHub Pages sont désormais `TrueBallKnower/KrasRoom` et `https://trueballknower.github.io/KrasRoom/`. Les identifiants de stockage, les comptes et le format `.roomora.zip` sont conservés pour retrouver les projets et sauvegardes existants.
 
 Application d’aménagement intérieur en français, entièrement exécutée dans le navigateur. React, TypeScript, Vite, Three.js / React Three Fiber, Zustand et IndexedDB. Aucun compte, serveur applicatif, abonnement ou clé API n’est nécessaire.
 
@@ -104,7 +104,7 @@ Les tests couvrent la détection et les surfaces sur des plans synthétiques, le
 
 ## GitHub Pages et déploiement automatique
 
-Le dépôt connecté est [TrueBallKnower/Roomora](https://github.com/TrueBallKnower/Roomora). Le workflow [.github/workflows/deploy.yml](.github/workflows/deploy.yml) est prêt pour les pushes sur `main` et les lancements manuels. Il installe les dépendances avec `npm ci`, lance les tests unitaires et navigateur, compile et publie `dist` avec les actions officielles GitHub Pages. Les permissions de publication sont limitées au job de déploiement.
+Le dépôt connecté est [TrueBallKnower/KrasRoom](https://github.com/TrueBallKnower/KrasRoom). Le workflow [.github/workflows/deploy.yml](.github/workflows/deploy.yml) est prêt pour les pushes sur `main` et les lancements manuels. Il installe les dépendances avec `npm ci`, lance les tests unitaires et navigateur, compile et publie `dist` avec les actions officielles GitHub Pages. Les permissions de publication sont limitées au job de déploiement.
 
 Si les autorisations API ne permettent pas l’activation automatique :
 
@@ -113,7 +113,7 @@ Si les autorisations API ne permettent pas l’activation automatique :
 3. Ouvrez **Actions → Build, test and deploy KrasRoom → Run workflow → main** si aucun push récent n’a déclenché le workflow.
 4. Attendez la réussite du job **deploy**. L’URL réellement publiée figure dans son environnement `github-pages`.
 
-L’adresse attendue est `https://trueballknower.github.io/Roomora/` ; sa présence ici ne constitue pas une confirmation de déploiement. `base: './'` garantit les chemins relatifs du JavaScript, du worker PDF et des ressources, y compris sous le chemin du dépôt. Aucun secret n’est nécessaire dans Actions.
+L’adresse attendue est `https://trueballknower.github.io/KrasRoom/` ; sa présence ici ne constitue pas une confirmation de déploiement. `base: './'` garantit les chemins relatifs du JavaScript, du worker PDF et des ressources, y compris sous le chemin du dépôt. Aucun secret n’est nécessaire dans Actions.
 
 ## Architecture et limites actuelles
 
