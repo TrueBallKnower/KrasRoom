@@ -26,6 +26,34 @@ export async function cloudTestService(browser: Browser, mobileB = false) {
     ),
     c = await browser.newContext();
   async function transport(context: BrowserContext) {
+    // Playwright WebKit interception omits multipart file contents (the route
+    // receives an empty File). Buffer the actual encoded body in this fake
+    // transport so the test server can inspect every byte. No app code changes.
+    await context.addInitScript(() => {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (
+          url.startsWith("https://roomora-test.supabase.co/storage/") &&
+          init?.body instanceof FormData
+        ) {
+          const encoded = new Response(init.body);
+          const headers = new Headers(init.headers);
+          headers.set("content-type", encoded.headers.get("content-type")!);
+          return nativeFetch(input, {
+            ...init,
+            headers,
+            body: await encoded.arrayBuffer(),
+          });
+        }
+        return nativeFetch(input, init);
+      };
+    });
     await context.route(
       "https://roomora-test.supabase.co/**",
       async (route) => {

@@ -83,7 +83,13 @@ test("un téléphone refusant les Blobs IndexedDB récupère réellement les fic
     for await (const part of sourceStream!) sourceParts.push(part);
     const sourceFiles = unzipSync(Buffer.concat(sourceParts));
     const sourceProject = JSON.parse(strFromU8(sourceFiles["project.json"]));
-    expect(Buffer.compare(Buffer.from(sourceFiles["assets/" + sourceProject.items[0].asset]), Buffer.from(model)), "Import et stockage source intacts").toBe(0);
+    expect(
+      Buffer.compare(
+        Buffer.from(sourceFiles["assets/" + sourceProject.items[0].asset]),
+        Buffer.from(model),
+      ),
+      "Import et stockage source intacts",
+    ).toBe(0);
     await laptop.getByRole("button", { name: /Mon compte/ }).click();
     await laptop
       .getByRole("button", {
@@ -98,20 +104,14 @@ test("un téléphone refusant les Blobs IndexedDB récupère réellement les fic
       ),
     ).toBeVisible();
     for (const bytes of service.files.values())
-      expect({size: bytes.length, expectedSize: model.length, firstDifference: bytes.findIndex((v,i) => v !== model[i]), head: bytes.subarray(0,100).toString(), tail: bytes.subarray(-100).toString()}, "Le service reçoit le modèle intact").toEqual({size: model.length, expectedSize: model.length, firstDifference: -1, head: Buffer.from(model).subarray(0,100).toString(), tail: Buffer.from(model).subarray(-100).toString()});
+      expect(
+        Buffer.compare(bytes, Buffer.from(model)),
+        "Le service reçoit le modèle intact",
+      ).toBe(0);
     await login(phone);
-    try {
-      await expect(phone.locator("footer")).toContainText("1 meubles", {
-        timeout: 20000,
-      });
-    } catch (error) {
-      throw Error(
-        "Diagnostic récupération WebKit (service simulé) : " +
-          (await phone.locator("body").innerText()) +
-          "\n" +
-          String(error),
-      );
-    }
+    await expect(phone.locator("footer")).toContainText("1 meubles", {
+      timeout: 20000,
+    });
     await expect(phone.getByRole("alert")).toHaveCount(0);
     await phone.getByRole("button", { name: "Fermer", exact: true }).click();
     await phone.reload();
