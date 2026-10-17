@@ -21,6 +21,7 @@ import {
   Armchair,
   AlertTriangle,
   ArrowDownToLine,
+  ArrowUpRight,
   ArrowUpFromLine,
   Box,
   Check,
@@ -104,28 +105,6 @@ function download(blob: Blob, name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-const iconFor = (kind: string) =>
-  kind === "bed"
-    ? "🛏"
-    : kind === "sofa"
-      ? "🛋"
-      : kind === "table"
-        ? "▱"
-        : kind === "plant"
-          ? "🪴"
-          : kind === "lamp"
-            ? "💡"
-            : kind === "chair"
-              ? "🪑"
-              : kind === "rug"
-                ? "▧"
-                : kind === "shower"
-                  ? "🚿"
-                  : kind === "sink"
-                    ? "◡"
-                    : kind === "tv"
-                      ? "▣"
-                      : "▥";
 export default function App() {
   const {
     project: p,
@@ -142,6 +121,7 @@ export default function App() {
     "(max-width: 1100px), (pointer: coarse) and (max-width: 1400px)",
   );
   const touch = useTouchDevice();
+  const [libraryExpanded, setLibraryExpanded] = useState(true);
   const [mobileSettings, setMobileSettings] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<
     "library" | "properties" | null
@@ -546,6 +526,7 @@ export default function App() {
             aria-label="Ouvrir le mobilier"
             onClick={() => {
               setTab("catalog");
+              setLibraryExpanded(true);
               if (compact) setMobilePanel("library");
             }}
           >
@@ -636,8 +617,61 @@ export default function App() {
       <div
         className="workspace"
         data-view={view}
+        data-library-open={libraryExpanded}
         data-settings-open={mobileSettings}
       >
+        <nav
+          className="workspace-rail"
+          aria-label="Outils de l’espace de travail"
+        >
+          <button
+            title="Mes appartements"
+            aria-label="Mes appartements"
+            onClick={openProjects}
+          >
+            <Folder size={20} />
+            <span>Projets</span>
+          </button>
+          <div className="rail-rule" />
+          <button
+            title="Afficher ou masquer la bibliothèque"
+            aria-label="Afficher ou masquer la bibliothèque"
+            aria-pressed={libraryExpanded}
+            onClick={() => setLibraryExpanded((v) => !v)}
+          >
+            <Armchair size={21} />
+            <span>Mobilier</span>
+          </button>
+          <button
+            title="Construction et plans"
+            aria-label="Construction et plans"
+            aria-pressed={tab === "build" && libraryExpanded}
+            onClick={() => {
+              setTab("build");
+              setLibraryExpanded(true);
+            }}
+          >
+            <Wallpaper size={20} />
+            <span>Plan</span>
+          </button>
+          <button
+            title="Ouvrir le studio de création"
+            aria-label="Ouvrir le studio de création"
+            onClick={() => {
+              setWorkshopSection("create");
+              setModal("split");
+            }}
+          >
+            <Box size={21} />
+            <span>Studio</span>
+          </button>
+          <div className="rail-bottom">
+            <span className="rail-monogram" aria-hidden="true">
+              kr.
+            </span>
+            <span>Votre intérieur.</span>
+          </div>
+        </nav>
         <aside
           className="left"
           data-mobile-open={mobilePanel === "library"}
@@ -685,221 +719,224 @@ export default function App() {
               Mes meubles
             </button>
           </div>
-          {tab === "build" ? (
-            <>
-              <button
-                className="primary full"
-                onClick={() => {
-                  setAutoFile(undefined);
-                  setModal("autoPlan");
-                }}
-              >
-                <ImagePlus size={18} />
-                Créer la 3D depuis mon plan
-              </button>
-              <p className="small">
-                Déposez votre plan et sa surface. KrasRoom propose
-                automatiquement les murs, pièces et ouvertures.
-              </p>
-              <p className="section-label">CORRIGER OU AJUSTER</p>
-              <div className="tool-list">
-                {[
-                  ["select", "Sélectionner", MousePointer2],
-                  ["wall", "Tracer des murs", Wallpaper],
-                  ["room", "Définir une pièce", Grid2X2],
-                  ["door", "Ajouter une porte", DoorOpen],
-                  ["window", "Ajouter une fenêtre", Layers],
-                  ["measure", "Mesurer une distance", Ruler],
-                  ["scale", "Calibrer le plan", Expand],
-                ].map(([key, label, Icon]) => (
-                  <button
-                    key={key as string}
-                    className={tool === key ? "active" : ""}
-                    onClick={() => {
-                      setView("2d");
-                      setTool(key as Tool);
-                      setMobilePanel(null);
-                    }}
-                  >
-                    {<Icon size={18} />}
-                    <span>{label as string}</span>
-                  </button>
-                ))}
-              </div>
-              <button
-                className="outline full"
-                onClick={() => planInput.current?.click()}
-              >
-                <ImagePlus size={18} />
-                Importer un plan PDF / image
-              </button>
-              <p className="notice">
-                Les outils ci-dessus servent à corriger les propositions
-                automatiques ou à construire manuellement si votre image ne peut
-                pas être reconnue.
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="search">
-                <Search size={16} />
-                <input
-                  aria-label="Rechercher un meuble"
-                  placeholder="Rechercher un meuble…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-              {tab === "catalog" && (
-                <div className="categories">
+          <div className="library-scroll">
+            {tab === "build" ? (
+              <>
+                <button
+                  className="primary full"
+                  onClick={() => {
+                    setAutoFile(undefined);
+                    setModal("autoPlan");
+                  }}
+                >
+                  <ImagePlus size={18} />
+                  Créer la 3D depuis mon plan
+                </button>
+                <p className="small">
+                  Déposez votre plan et sa surface. KrasRoom propose
+                  automatiquement les murs, pièces et ouvertures.
+                </p>
+                <p className="section-label">CORRIGER OU AJUSTER</p>
+                <div className="tool-list">
                   {[
-                    "Toutes",
-                    "Salon",
-                    "Chambre",
-                    "Cuisine",
-                    "Bureau",
-                    "Salle de bain",
-                    "Décoration",
-                  ].map((c) => (
+                    ["select", "Sélectionner", MousePointer2],
+                    ["wall", "Tracer des murs", Wallpaper],
+                    ["room", "Définir une pièce", Grid2X2],
+                    ["door", "Ajouter une porte", DoorOpen],
+                    ["window", "Ajouter une fenêtre", Layers],
+                    ["measure", "Mesurer une distance", Ruler],
+                    ["scale", "Calibrer le plan", Expand],
+                  ].map(([key, label, Icon]) => (
                     <button
-                      key={c}
-                      className={category === c ? "active" : ""}
-                      onClick={() => setCategory(c)}
+                      key={key as string}
+                      className={tool === key ? "active" : ""}
+                      onClick={() => {
+                        setView("2d");
+                        setTool(key as Tool);
+                        setMobilePanel(null);
+                      }}
                     >
-                      {c}
+                      {<Icon size={18} />}
+                      <span>{label as string}</span>
                     </button>
                   ))}
                 </div>
-              )}
-              <div className="section-line">
-                <span className="section-label">
-                  {tab === "catalog" ? "LES ESSENTIELS" : "VOTRE COLLECTION"}
-                </span>
-                <span>
-                  {tab === "catalog" ? filtered.length : personal.length}
-                </span>
-              </div>
-              <div className="catalog">
-                {tab === "catalog"
-                  ? filtered.map((c) => (
-                      <button
-                        draggable
-                        onDragStart={(e) =>
-                          e.dataTransfer.setData(
-                            "roomora-item",
-                            JSON.stringify(furniture(c)),
-                          )
-                        }
-                        className="furniture-card"
-                        key={c[0]}
-                        onClick={() => add(furniture(c))}
-                      >
-                        <div className={"furniture-preview " + c[1]}>
-                          <FurniturePreview kind={c[1]} />
-                          <span className="add-circle">
-                            <Plus size={14} />
-                          </span>
-                        </div>
-                        <strong>{c[0]}</strong>
-                        <small>
-                          {c[2]} × {c[3]} m
-                        </small>
-                      </button>
-                    ))
-                  : personal
-                      .filter((i) =>
-                        i.name.toLowerCase().includes(query.toLowerCase()),
-                      )
-                      .map((i) => (
-                        <div className="personal-card" key={i.id}>
-                          <button
-                            className="furniture-card"
-                            draggable
-                            onDragStart={(e) =>
-                              e.dataTransfer.setData(
-                                "roomora-item",
-                                JSON.stringify(i),
-                              )
-                            }
-                            onClick={() => add(i)}
-                          >
-                            <div className="furniture-preview">
-                              {i.photo ? (
-                                <AssetImage id={i.photo} alt={i.name} />
-                              ) : (
-                                <FurniturePreview kind={i.kind} />
-                              )}
-                              <span className="add-circle">
-                                <Plus size={14} />
-                              </span>
-                            </div>
-                            <strong>{i.name}</strong>
-                            <small>
-                              {i.width} × {i.depth} m
-                            </small>
-                          </button>
-                          <div className="personal-actions">
-                            <button
-                              onClick={() => {
-                                const name = prompt("Nouveau nom", i.name);
-                                if (name)
-                                  run(async () => {
-                                    await libraryPut({ ...i, name });
-                                    setPersonal(await library());
-                                  });
-                              }}
-                            >
-                              Renommer
-                            </button>
-                            <button
-                              title="Supprimer de la bibliothèque"
-                              onClick={() =>
-                                run(async () => {
-                                  await libraryDelete(i.id);
-                                  setPersonal(await library());
-                                })
-                              }
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-              </div>
-              {tab === "personal" && !personal.length && (
-                <p className="small">
-                  Vos modèles et références enregistrés apparaîtront ici.
-                  Sélectionnez un meuble puis « Garder dans Mes meubles ».
+                <button
+                  className="outline full"
+                  onClick={() => planInput.current?.click()}
+                >
+                  <ImagePlus size={18} />
+                  Importer un plan PDF / image
+                </button>
+                <p className="notice">
+                  Les outils ci-dessus servent à corriger les propositions
+                  automatiques ou à construire manuellement si votre image ne
+                  peut pas être reconnue.
                 </p>
-              )}
-              <button
-                className="outline full"
-                onClick={() => {
-                  setWorkshopSection("create");
-                  setModal("split");
-                }}
-              >
-                Atelier 3D · créer et importer
-              </button>
-              <button
-                className="outline full import-button"
-                onClick={() => setModal("import")}
-              >
-                <Plus size={17} />
-                Ajouter mon propre meuble
-              </button>
-            </>
-          )}
-          <div className="local-card">
-            <span className="local-dot" />
-            <div>
-              <strong>Un espace qui vous appartient</strong>
-              <p>
-                Sans compte. Sans abonnement.
-                <br />
-                Vos projets restent sur cet appareil.
-              </p>
-            </div>
+              </>
+            ) : (
+              <>
+                <div className="search">
+                  <Search size={16} />
+                  <input
+                    aria-label="Rechercher un meuble"
+                    placeholder="Rechercher un meuble…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                {tab === "catalog" && (
+                  <div className="categories">
+                    {[
+                      "Toutes",
+                      "Salon",
+                      "Chambre",
+                      "Cuisine",
+                      "Bureau",
+                      "Salle de bain",
+                      "Décoration",
+                    ].map((c) => (
+                      <button
+                        key={c}
+                        className={category === c ? "active" : ""}
+                        onClick={() => setCategory(c)}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="section-line">
+                  <span className="section-label">
+                    {tab === "catalog" ? "LES ESSENTIELS" : "VOTRE COLLECTION"}
+                  </span>
+                  <span>
+                    {tab === "catalog" ? filtered.length : personal.length}
+                  </span>
+                </div>
+                <div className="catalog">
+                  {tab === "catalog"
+                    ? filtered.map((c) => (
+                        <button
+                          draggable
+                          onDragStart={(e) =>
+                            e.dataTransfer.setData(
+                              "roomora-item",
+                              JSON.stringify(furniture(c)),
+                            )
+                          }
+                          className="furniture-card"
+                          key={c[0]}
+                          onClick={() => add(furniture(c))}
+                        >
+                          <div className={"furniture-preview " + c[1]}>
+                            <FurniturePreview kind={c[1]} />
+                            <span className="add-circle">
+                              <Plus size={14} />
+                            </span>
+                          </div>
+                          <strong>{c[0]}</strong>
+                          <small>
+                            {c[2]} × {c[3]} m
+                          </small>
+                        </button>
+                      ))
+                    : personal
+                        .filter((i) =>
+                          i.name.toLowerCase().includes(query.toLowerCase()),
+                        )
+                        .map((i) => (
+                          <div className="personal-card" key={i.id}>
+                            <button
+                              className="furniture-card"
+                              draggable
+                              onDragStart={(e) =>
+                                e.dataTransfer.setData(
+                                  "roomora-item",
+                                  JSON.stringify(i),
+                                )
+                              }
+                              onClick={() => add(i)}
+                            >
+                              <div className="furniture-preview">
+                                {i.photo ? (
+                                  <AssetImage id={i.photo} alt={i.name} />
+                                ) : (
+                                  <FurniturePreview kind={i.kind} />
+                                )}
+                                <span className="add-circle">
+                                  <Plus size={14} />
+                                </span>
+                              </div>
+                              <strong>{i.name}</strong>
+                              <small>
+                                {i.width} × {i.depth} m
+                              </small>
+                            </button>
+                            <div className="personal-actions">
+                              <button
+                                onClick={() => {
+                                  const name = prompt("Nouveau nom", i.name);
+                                  if (name)
+                                    run(async () => {
+                                      await libraryPut({ ...i, name });
+                                      setPersonal(await library());
+                                    });
+                                }}
+                              >
+                                Renommer
+                              </button>
+                              <button
+                                title="Supprimer de la bibliothèque"
+                                onClick={() =>
+                                  run(async () => {
+                                    await libraryDelete(i.id);
+                                    setPersonal(await library());
+                                  })
+                                }
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                </div>
+                {tab === "personal" && !personal.length && (
+                  <p className="small">
+                    Vos modèles et références enregistrés apparaîtront ici.
+                    Sélectionnez un meuble puis « Garder dans Mes meubles ».
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          <div className="library-footer">
+            {tab !== "build" && (
+              <>
+                <button
+                  className="primary full"
+                  onClick={() => setModal("import")}
+                >
+                  <Plus size={17} />
+                  Ajouter mon propre meuble
+                </button>
+                <button
+                  className="library-studio-link"
+                  onClick={() => {
+                    setWorkshopSection("create");
+                    setModal("split");
+                  }}
+                >
+                  <Box size={15} />
+                  Atelier 3D · créer et importer
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </button>
+              </>
+            )}
+            <p>
+              <span className="local-dot" />
+              Enregistrement automatique sur cet appareil
+            </p>
           </div>
         </aside>
         <main
@@ -1366,8 +1403,11 @@ export default function App() {
                 {item.photo ? (
                   <AssetImage id={item.photo} alt={item.name} />
                 ) : (
-                  <span>{iconFor(item.kind)}</span>
+                  <FurniturePreview kind={item.kind} />
                 )}
+              </div>
+              <div className="inspector-section-label">
+                01 — Objet & dimensions
               </div>
               <label className="field">
                 Nom
@@ -1400,6 +1440,7 @@ export default function App() {
                 </button>
               )}
               <div className="property-section">
+                <div className="inspector-section-label">02 — Placement</div>
                 <h4>Position et orientation</h4>
                 <div className="workshop-actions">
                   <button
@@ -1899,11 +1940,14 @@ export default function App() {
                 </p>
               </div>
               <div className="project-summary">
+                <span className="inspector-section-label">
+                  LE PROJET EN CHIFFRES
+                </span>
+                <p className="project-area">
+                  {totalArea.toFixed(1)}
+                  <span>m²</span>
+                </p>
                 <h4>Votre appartement</h4>
-                <div>
-                  <span>Surface dessinée</span>
-                  <strong>{totalArea.toFixed(1)} m²</strong>
-                </div>
                 <div>
                   <span>Pièces</span>
                   <strong>{p.rooms.length}</strong>
