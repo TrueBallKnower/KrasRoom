@@ -1,0 +1,265 @@
+/* Porcelain surfaces, machined controls and restrained electric highlights. */
+:root {
+  --muted: #5f6c84;
+  --raised-face: linear-gradient(180deg, #ffffff 0%, #f3f5fc 100%);
+  --raised-edge: #d8deed;
+  --raised-shadow: inset 0 1px 0 #fff, 0 2px 0 #d9dfed, 0 4px 8px #17264d0a;
+  --accent-face: linear-gradient(165deg, #5662e8, #4d52df 68%, #4244c6);
+  --accent-edge: #4144bf;
+  --accent-shadow:
+    inset 0 1px 0 #ffffff5c, 0 3px 0 #373bb2, 0 6px 14px #4d52df28;
+}
+[data-theme="dark"] {
+  --muted: #a9b5cf;
+  --raised-face: linear-gradient(180deg, #303c59, #222c43);
+  --raised-edge: #45516c;
+  --raised-shadow: inset 0 1px 0 #ffffff12, 0 2px 0 #11192c, 0 4px 8px #0002;
+  --accent-face: linear-gradient(165deg, #5964eb, #535de2 70%, #4851cb);
+  --accent-edge: #818bf3;
+  --accent-shadow: inset 0 1px 0 #ffffff45, 0 3px 0 #343b99, 0 6px 16px #0003;
+}
+.app > header {
+  background: var(--raised-face);
+  box-shadow:
+    0 1px 0 #ffffff70,
+    0 4px 20px #13285505;
+}
+.app .brand-mark {
+  border: 1px solid var(--accent-edge);
+  color: white;
+  background: var(--accent-face);
+  box-shadow: var(--accent-shadow);
+}
+.app .workspace {
+  background-image: radial-gradient(
+    ellipse at 45% 0%,
+    #737cff0d,
+    transparent 65%
+  );
+}
+.app .workspace-rail {
+  background: linear-gradient(165deg, #25315a, #151c36 65%, #11182d);
+  box-shadow:
+    inset -1px 0 0 #ffffff16,
+    3px 0 16px #17264d0a;
+}
+.app .workspace-rail > button[aria-pressed="true"] {
+  background: linear-gradient(135deg, #7182ff40, #7182ff12);
+  box-shadow:
+    inset 0 1px 0 #ffffff1c,
+    inset 3px 0 0 #aab4ff;
+}
+.app .workspace > aside {
+  background-image: linear-gradient(160deg, #8491ff08, transparent 35%);
+  box-shadow:
+    inset 0 1px 0 #ffffff85,
+    0 5px 20px #17264d06;
+}
+.app .workspace > main {
+  box-shadow: 0 6px 24px #17264d08;
+}
+.app .sidebar-heading h2 {
+  letter-spacing: -0.8px;
+}
+.app .view-switch,
+.app .viewport-actions,
+.app .tabs {
+  background: var(--soft);
+  box-shadow:
+    inset 0 1px 3px #17264d08,
+    0 1px 0 #ffffff70;
+}
+.app .view-switch button,
+.app .viewport-actions button,
+.app .drawing-toolbar button,
+.app .camera-tools button,
+.app .camera-cube button,
+.app .scene-object-actions button {
+  border: 1px solid transparent;
+  transition:
+    background 160ms,
+    box-shadow 160ms,
+    border-color 160ms,
+    transform 160ms;
+}
+.app .primary,
+.app .import-button,
+.app .view-switch button.active,
+.app .add-circle {
+  color: white;
+  background: var(--accent-face);
+  border: 1px solid var(--accent-edge);
+  box-shadow: var(--accent-shadow);
+  text-shadow: 0 1px 1px #22257440;
+}
+.app .outline,
+.app .camera-toolbar-toggle,
+.app .scene-object-actions button,
+.app .plan-controls button,
+.app .camera-tools,
+.app .camera-cube,
+.app .drawing-toolbar {
+  background: var(--raised-face);
+  border-color: var(--raised-edge);
+  box-shadow: var(--raised-shadow);
+}
+.app .tabs button.active,
+.app .viewport-actions button[aria-pressed="true"],
+.app .drawing-toolbar button.active,
+.app .camera-tools button[aria-pressed="true"] {
+  background: var(--raised-face);
+  color: var(--green);
+  border-color: var(--raised-edge);
+  box-shadow: var(--raised-shadow);
+}
+.app .viewport-actions button[aria-pressed="true"] {
+  box-shadow:
+    var(--raised-shadow),
+    inset 0 -2px 0 var(--green);
+}
+.app .furniture-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 5px;
+  background: var(--bg);
+  box-shadow: 0 2px 0 #17264d06;
+  transition:
+    border-color 180ms,
+    box-shadow 180ms,
+    transform 180ms;
+}
+.app .furniture-preview,
+.app .selection-preview {
+  background:
+    radial-gradient(ellipse at 50% 20%, #fff9, transparent 70%),
+    linear-gradient(150deg, #e8edf9, #f3f5fb 55%, #e0e6f4);
+  border: 1px solid #dfe5f1;
+  border-radius: 8px;
+}
+.app .furniture-preview svg {
+  filter: drop-shadow(0 5px 3px #253b5b18);
+  transition: transform 220ms;
+}
+.app .furniture-card strong {
+  color: var(--ink);
+}
+.app .selection-preview::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 #ffffffa0;
+}
+.app .project-summary,
+.app .dimensions-section {
+  background-image: linear-gradient(145deg, #7182ff08, transparent 80%);
+}
+.app .render-controls,
+.app .visit-settings,
+.app .scene-object-actions {
+  border: 1px solid var(--raised-edge);
+  box-shadow:
+    inset 0 1px 0 #ffffff70,
+    0 4px 18px #17264d12;
+}
+.app .render-controls > summary {
+  background: var(--raised-face);
+}
+.app .render-controls > summary > svg:first-child {
+  color: var(--green);
+}
+.app .modal {
+  box-shadow:
+    inset 0 1px 0 #ffffffa0,
+    0 28px 80px #10172c30;
+}
+.app .modal h2 {
+  letter-spacing: -0.7px;
+}
+.app .number,
+.app input:not([type="range"]):not([type="checkbox"]):not([type="color"]),
+.app select {
+  box-shadow: inset 0 1px 3px #17264d05;
+}
+.app .number:focus-within,
+.app input:focus,
+.app select:focus {
+  box-shadow: 0 0 0 3px var(--tint);
+}
+[data-theme="dark"] .app .furniture-preview,
+[data-theme="dark"] .app .selection-preview {
+  background:
+    radial-gradient(ellipse at 50% 10%, #6275bc2b, transparent 80%),
+    linear-gradient(150deg, #263451, #202b42);
+  border-color: #3c4965;
+}
+[data-theme="dark"] .app .workspace > aside,
+[data-theme="dark"] .app .render-controls,
+[data-theme="dark"] .app .visit-settings {
+  box-shadow:
+    inset 0 1px 0 #ffffff0d,
+    0 5px 20px #0002;
+}
+@media (hover: hover) and (pointer: fine) {
+  .app .primary:not(:disabled):hover,
+  .app .import-button:not(:disabled):hover,
+  .app .outline:not(:disabled):hover {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+  }
+  .app .furniture-card:hover {
+    border-color: var(--green);
+    box-shadow:
+      0 2px 0 #6876e72b,
+      0 8px 20px #5365a51a;
+    transform: translateY(-2px);
+  }
+  .app .furniture-card:hover .furniture-preview svg {
+    transform: translateY(-3px);
+  }
+  .app .viewport-actions button:hover,
+  .app .drawing-toolbar button:hover,
+  .app .camera-tools button:hover,
+  .app .scene-object-actions button:hover {
+    background: var(--tint);
+    border-color: var(--raised-edge);
+  }
+}
+.app .primary:not(:disabled):active,
+.app .outline:not(:disabled):active,
+.app .view-switch button:active,
+.app .scene-object-actions button:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 3px #17264d20;
+}
+.app .workspace[data-focused="true"] > .left,
+.app .workspace[data-focused="true"] > .right {
+  display: none;
+}
+@media (min-width: 1101px) and (pointer: fine), (min-width: 1401px) {
+  .app:not(.immersive-visit) .workspace[data-focused="true"],
+  .app:not(.immersive-visit)
+    .workspace[data-focused="true"][data-library-open="false"] {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app button,
+  .app .furniture-preview svg {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .app button,
+  .app .furniture-card {
+    border: 1px solid ButtonText;
+    box-shadow: none;
+  }
+  .app button[aria-pressed="true"],
+  .app .view-switch button.active {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+}

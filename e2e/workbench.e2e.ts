@@ -145,3 +145,51 @@ test("les panneaux restent séparés en visite et en 3D, même dans une fenêtre
     ).toBe(true);
   }
 });
+
+test("espace dégagé : retrouver les panneaux et garder la visite immersive", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const toggle = page.getByRole("button", {
+    name: "Dégager l’espace de travail",
+    exact: true,
+  });
+  const left = page.getByRole("complementary", {
+    name: "Bibliothèque et construction",
+  });
+  const right = page.getByRole("complementary", {
+    name: "Propriétés de la sélection",
+  });
+  const width = (await page.locator(".plan-svg").boundingBox())!.width;
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(left).toBeHidden();
+  await expect(right).toBeHidden();
+  await expect
+    .poll(async () => (await page.locator(".plan-svg").boundingBox())!.width)
+    .toBeGreaterThan(width + 500);
+  await page
+    .getByRole("button", {
+      name: "Afficher ou masquer la bibliothèque",
+      exact: true,
+    })
+    .click();
+  await expect(left).toBeVisible();
+  await expect(right).toBeVisible();
+  await toggle.click();
+  await page.getByRole("button", { name: "Visite", exact: true }).click();
+  await page.keyboard.press("l");
+  await expect(page.locator(".app")).toHaveClass(/immersive-visit/);
+  await expect
+    .poll(async () => (await page.locator("canvas").boundingBox())!.width)
+    .toBeCloseTo(1440, 0);
+  await page.keyboard.press("l");
+  await toggle.click();
+  await expect(left).toBeVisible();
+  await expect(right).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await toggle.evaluate((el) => getComputedStyle(el).transitionDuration),
+  ).toBe("0s");
+});

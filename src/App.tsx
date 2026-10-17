@@ -36,6 +36,7 @@ import {
   Copy,
   DoorOpen,
   Expand,
+  PanelLeftClose,
   Eye,
   EyeOff,
   Folder,
@@ -129,6 +130,7 @@ export default function App() {
   );
   const touch = useTouchDevice();
   const [libraryExpanded, setLibraryExpanded] = useState(true);
+  const [focusedWorkspace, setFocusedWorkspace] = useState(false);
   const [mobileSettings, setMobileSettings] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<
     "library" | "properties" | null
@@ -178,6 +180,9 @@ export default function App() {
   const [experience, setExperience] = useState<"simple" | "pro">(() =>
     localStorage.getItem("krasroom-experience") === "pro" ? "pro" : "simple",
   );
+  useEffect(() => {
+    if (mobilePanel) setFocusedWorkspace(false);
+  }, [mobilePanel]);
   useEffect(() => {
     setMobileSettings(view === "3d" && !compact);
   }, [view, compact]);
@@ -591,6 +596,7 @@ export default function App() {
           <button
             aria-label="Ouvrir le mobilier"
             onClick={() => {
+              setFocusedWorkspace(false);
               setTab("catalog");
               setLibraryExpanded(true);
               if (compact) setMobilePanel("library");
@@ -685,12 +691,22 @@ export default function App() {
       <div
         className="workspace"
         data-view={view}
+        data-focused={focusedWorkspace}
         data-library-open={libraryExpanded}
         data-settings-open={mobileSettings}
       >
         <nav
           className="workspace-rail"
           aria-label="Outils de l’espace de travail"
+          onClickCapture={(event) => {
+            if (
+              !(event.target as HTMLElement).closest(
+                '[aria-label="Afficher ou masquer la bibliothèque"]',
+              )
+            ) {
+              setFocusedWorkspace(false);
+            }
+          }}
         >
           <button
             title="Mes appartements"
@@ -705,7 +721,10 @@ export default function App() {
             title="Afficher ou masquer la bibliothèque"
             aria-label="Afficher ou masquer la bibliothèque"
             aria-pressed={libraryExpanded}
-            onClick={() => setLibraryExpanded((v) => !v)}
+            onClick={() => {
+              setFocusedWorkspace(false);
+              setLibraryExpanded((v) => focusedWorkspace || !v);
+            }}
           >
             <Armchair size={21} />
             <span>Mobilier</span>
@@ -1194,6 +1213,22 @@ export default function App() {
                 onClick={() => setHide(!hide)}
               >
                 {hide ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+              <button
+                aria-label="Dégager l’espace de travail"
+                title={
+                  focusedWorkspace
+                    ? "Retrouver les panneaux"
+                    : "Dégager l’espace de travail"
+                }
+                aria-pressed={focusedWorkspace}
+                onClick={() => {
+                  setFocusedWorkspace((value) => !value);
+                  setMobilePanel(null);
+                  setMobileSettings(false);
+                }}
+              >
+                <PanelLeftClose size={17} />
               </button>
               <button
                 title="Plein écran"
