@@ -666,6 +666,8 @@ export default function App() {
           </button>
           <button
             className="primary"
+            aria-label="Exporter"
+            title="Exporter le projet"
             onClick={() =>
               run(async () =>
                 download(await exportProject(p), p.name + ".roomora.zip"),
@@ -1438,99 +1440,108 @@ export default function App() {
                     </small>
                   </div>
                 )}
-                <div className="render-controls">
-                  <label>
-                    Rendu{" "}
-                    <select
-                      aria-label="Style de rendu"
-                      value={realistic ? "realistic" : "standard"}
-                      onChange={(e) =>
-                        setRealistic(e.target.value === "realistic")
-                      }
+                <details className="render-controls" open>
+                  <summary>
+                    <Sun size={15} />
+                    Rendu et ambiance
+                    <ChevronDown size={14} />
+                  </summary>
+                  <div className="render-controls-body">
+                    <label>
+                      Rendu{" "}
+                      <select
+                        aria-label="Style de rendu"
+                        value={realistic ? "realistic" : "standard"}
+                        onChange={(e) =>
+                          setRealistic(e.target.value === "realistic")
+                        }
+                      >
+                        <option value="standard">Standard · fluide</option>
+                        <option value="realistic">
+                          Réaliste · matières et lumière
+                        </option>
+                      </select>
+                    </label>
+                    {
+                      <>
+                        <label>
+                          Lumière{" "}
+                          <select
+                            aria-label="Ambiance lumineuse"
+                            value={lighting}
+                            onChange={(e) =>
+                              setLighting(e.target.value as LightingProfile)
+                            }
+                          >
+                            {Object.entries(lightingProfiles).map(([id, p]) => (
+                              <option key={id} value={id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Exposition{" "}
+                          <input
+                            aria-label="Exposition du rendu"
+                            type="range"
+                            min="0.6"
+                            max="1.6"
+                            step="0.05"
+                            value={exposure}
+                            onChange={(e) =>
+                              setExposure(Number(e.target.value))
+                            }
+                          />
+                          <span>{exposure.toFixed(2)}</span>
+                        </label>
+                      </>
+                    }
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={transparent}
+                        onChange={(e) => setTransparent(e.target.checked)}
+                      />
+                      Murs transparents
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={ceiling}
+                        onChange={(e) => setCeiling(e.target.checked)}
+                      />
+                      Plafond
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={showLightMarkers}
+                        onChange={(e) => setShowLightMarkers(e.target.checked)}
+                      />
+                      Repères des lumières
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={quality}
+                        onChange={(e) => setQuality(e.target.checked)}
+                      />
+                      Haute qualité
+                    </label>
+                    <button
+                      onClick={() => {
+                        const c = document.querySelector("canvas");
+                        if (c)
+                          c.toBlob((b) => {
+                            if (b) download(b, "krasroom-vue.png");
+                          });
+                      }}
                     >
-                      <option value="standard">Standard · fluide</option>
-                      <option value="realistic">
-                        Réaliste · matières et lumière
-                      </option>
-                    </select>
-                  </label>
-                  {
-                    <>
-                      <label>
-                        Lumière{" "}
-                        <select
-                          aria-label="Ambiance lumineuse"
-                          value={lighting}
-                          onChange={(e) =>
-                            setLighting(e.target.value as LightingProfile)
-                          }
-                        >
-                          {Object.entries(lightingProfiles).map(([id, p]) => (
-                            <option key={id} value={id}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        Exposition{" "}
-                        <input
-                          aria-label="Exposition du rendu"
-                          type="range"
-                          min="0.6"
-                          max="1.6"
-                          step="0.05"
-                          value={exposure}
-                          onChange={(e) => setExposure(Number(e.target.value))}
-                        />
-                        <span>{exposure.toFixed(2)}</span>
-                      </label>
-                    </>
-                  }
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={transparent}
-                      onChange={(e) => setTransparent(e.target.checked)}
-                    />
-                    Murs transparents
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={ceiling}
-                      onChange={(e) => setCeiling(e.target.checked)}
-                    />
-                    Plafond
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={showLightMarkers}
-                      onChange={(e) => setShowLightMarkers(e.target.checked)}
-                    />
-                    Repères des lumières
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={quality}
-                      onChange={(e) => setQuality(e.target.checked)}
-                    />
-                    Haute qualité
-                  </label>
-                  <button
-                    onClick={() => {
-                      const c = document.querySelector("canvas");
-                      if (c)
-                        c.toBlob((b) => {
-                          if (b) download(b, "krasroom-vue.png");
-                        });
-                    }}
-                  >
-                    Capture PNG
-                  </button>
-                </div>
+                      Capture PNG
+                    </button>
+                  </div>
+                </details>
               </>
             )}
           </div>

@@ -48,3 +48,42 @@ test("espace de travail : bibliothèque repliable, import accessible et retour a
     }),
   ).toBeVisible();
 });
+
+test("panneaux 3D : replier les réglages sans perdre leur état", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+  const navigation = page.getByRole("button", {
+    name: "Navigation 3D",
+    exact: true,
+  });
+  await expect(navigation).toHaveAttribute("aria-expanded", "true");
+  await navigation.press("Space");
+  await expect(navigation).toHaveAttribute("aria-expanded", "false");
+  await expect(
+    page.getByRole("button", { name: "Dessus", exact: true }),
+  ).toBeHidden();
+  await navigation.click();
+  await expect(
+    page.getByRole("button", { name: "Dessus", exact: true }),
+  ).toBeVisible();
+  const settings = page.locator(".render-controls");
+  await settings.getByLabel("Murs transparents", { exact: true }).uncheck();
+  await settings.locator("summary").press("Space");
+  await expect(
+    settings.getByLabel("Style de rendu", { exact: true }),
+  ).toBeHidden();
+  await settings.locator("summary").click();
+  await expect(
+    settings.getByLabel("Style de rendu", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    settings.getByLabel("Murs transparents", { exact: true }),
+  ).not.toBeChecked();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("button", { name: "Exporter", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+});

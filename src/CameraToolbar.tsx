@@ -1,3 +1,4 @@
+import { useMediaQuery } from "./useDevice";
 import { useEffect, useState } from "react";
 import { MousePointer2, Hand, Scan, Focus, Box } from "lucide-react";
 import { useStore } from "./store";
@@ -5,11 +6,15 @@ import { useNavigation } from "./navigation";
 export default function CameraToolbar() {
   const { mode, setMode, issue, space, placement, setPlacement } =
     useNavigation();
-  const [expanded, setExpanded] = useState(false);
+  const compact = useMediaQuery(
+    "(max-width: 1100px), (pointer: coarse) and (max-width: 1400px)",
+  );
+  const [expanded, setExpanded] = useState(!compact);
+  useEffect(() => setExpanded(!compact), [compact]);
   useEffect(() => {
     const editing = (e: KeyboardEvent) =>
       (e.target as HTMLElement)?.closest?.(
-        "input,textarea,select,[contenteditable],[role=dialog]",
+        "input,textarea,select,summary,.camera-toolbar-toggle,[contenteditable],[role=dialog]",
       );
     const down = (e: KeyboardEvent) => {
       if (
@@ -73,6 +78,7 @@ export default function CameraToolbar() {
     <div className="camera-toolbar" aria-label="Navigation 3D">
       <button
         className="camera-toolbar-toggle"
+        aria-label="Navigation 3D"
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
       >

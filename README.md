@@ -182,6 +182,8 @@ Le créateur, le nettoyeur, leurs styles et l’exporteur GLB sont chargés à l
 
 ### Espace de travail
 
+Les panneaux **Navigation 3D** et **Rendu et ambiance** se replient par leur en-tête sans modifier les réglages du projet. La navigation démarre repliée sur téléphone et tablette. Les champs numériques affichent leur unité dans une zone distincte ; les propriétés défilent sans comprimer l’aperçu du meuble.
+
 Sur ordinateur, la barre verticale donne accès aux projets, au mobilier, à la construction et au Studio. Le bouton **Mobilier** de cette barre masque ou réaffiche la bibliothèque pour agrandir le plan ; **Mobilier** en haut la rouvre sur le catalogue. Le catalogue défile indépendamment du bouton **Ajouter mon propre meuble**, qui reste accessible en bas du panneau. Les catégories se parcourent horizontalement. Les propriétés de la sélection et le résumé du projet occupent un panneau distinct à droite. Sur téléphone et tablette, les panneaux restent accessibles par la navigation inférieure.
 
 ### Nuit, sources lumineuses et niveaux d’interface
