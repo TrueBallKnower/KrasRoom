@@ -1,3 +1,9 @@
+import {
+  lightingProfiles,
+  validLightSettings,
+  MAX_LIGHTS,
+  type LightSettings,
+} from "./lighting";
 import { floorFinishes, wallFinishes } from "./floorFinishes";
 export type Point = { x: number; y: number };
 export type Wall = {
@@ -23,6 +29,7 @@ export type Opening = {
   detection?: { confidence: number; reviewed: boolean };
 };
 export type Item = {
+  light?: LightSettings;
   id: string;
   name: string;
   kind: string;
@@ -60,6 +67,7 @@ export type Room = {
   textureAngle?: number;
 };
 export type Project = {
+  environment?: { lighting: keyof typeof lightingProfiles; exposure: number };
   version: 1;
   id: string;
   name: string;
@@ -134,7 +142,7 @@ export function overlaps(a: Point[], b: Point[]) {
 export function occupiedItems(
   item: Item,
 ): { item: Item; bottom: number; top: number }[] {
-  if (item.kind === "rug") return [];
+  if (item.kind === "rug" || item.kind === "light") return [];
   if (!item.footprints)
     return [
       {
@@ -334,6 +342,17 @@ export function validateProject(v: unknown): asserts v is Project {
     !Array.isArray(p.rooms)
   )
     throw Error("Sauvegarde KrasRoom invalide.");
+  if (
+    p.environment !== undefined &&
+    (!p.environment ||
+      !Object.hasOwn(lightingProfiles, p.environment.lighting) ||
+      !finite(p.environment.exposure) ||
+      p.environment.exposure < 0.6 ||
+      p.environment.exposure > 1.6)
+  )
+    throw Error("Ambiance lumineuse invalide.");
+  if (p.items.filter((i) => i.kind === "light").length > MAX_LIGHTS)
+    throw Error(`Maximum ${MAX_LIGHTS} sources lumineuses par projet.`);
   const ids = new Set<string>();
   for (const object of [...p.items, ...p.walls, ...p.rooms]) {
     if (!object || !text(object.id) || ids.has(object.id))
@@ -341,6 +360,12 @@ export function validateProject(v: unknown): asserts v is Project {
     ids.add(object.id);
   }
   for (const i of p.items) {
+    if (
+      (i.kind === "light" && !validLightSettings(i.light)) ||
+      (i.light !== undefined &&
+        (i.kind !== "light" || !validLightSettings(i.light)))
+    )
+      throw Error("Source lumineuse invalide.");
     if (
       !text(i.name) ||
       !text(i.kind) ||

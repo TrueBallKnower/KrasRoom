@@ -5,6 +5,16 @@ export default function FurniturePreview({ kind }: { kind: string }) {
     dark = "#536578";
   const shapes = (() => {
     switch (kind) {
+      case "light":
+        return (
+          <>
+            <path
+              d="M45 52C27 29 43 12 61 12S95 29 77 52L73 61H49Z"
+              fill="#fff0b8"
+            />
+            <path d="M49 66H73M51 72H71M57 78H65M55 55V38M67 55V38M20 33H28M94 33H102M32 13L38 19M84 19L90 13" />
+          </>
+        );
       case "sofa":
         return (
           <>

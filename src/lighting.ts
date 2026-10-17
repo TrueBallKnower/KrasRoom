@@ -1,4 +1,47 @@
+export type LightSettings = {
+  type: "point" | "spot";
+  enabled: boolean;
+  lumens: number;
+  color: string;
+  range: number;
+  angle: number;
+  tilt: number;
+  shadows: boolean;
+};
+export const MAX_LIGHTS = 12;
+export function validLightSettings(value: unknown): value is LightSettings {
+  const v = value as LightSettings;
+  return (
+    !!v &&
+    ["point", "spot"].includes(v.type) &&
+    typeof v.enabled === "boolean" &&
+    typeof v.shadows === "boolean" &&
+    /^#[0-9a-f]{6}$/i.test(v.color) &&
+    Number.isFinite(v.lumens) &&
+    v.lumens >= 0 &&
+    v.lumens <= 10000 &&
+    Number.isFinite(v.range) &&
+    v.range >= 1 &&
+    v.range <= 30 &&
+    Number.isFinite(v.angle) &&
+    v.angle >= 10 &&
+    v.angle <= 120 &&
+    Number.isFinite(v.tilt) &&
+    v.tilt >= 0 &&
+    v.tilt <= 90
+  );
+}
 export const lightingProfiles = {
+  night: {
+    name: "Nuit · éclairage intérieur",
+    color: "#aabfff",
+    sky: "#111b36",
+    ground: "#11121e",
+    ambient: 0.04,
+    hemisphere: 0.08,
+    sun: 0.015,
+    fill: 0.02,
+  },
   daylight: {
     name: "Jour naturel",
     color: "#fff4df",

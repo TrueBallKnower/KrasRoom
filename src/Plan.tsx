@@ -545,8 +545,9 @@ export default function Plan({
             </text>
           </g>
         ))}
-        {!hide &&
-          p.items.map((i) => {
+        {p.items
+          .filter((i) => !hide || i.kind === "light")
+          .map((i) => {
             const pos = drag?.id === i.id ? drag.point : i;
             return (
               <g
@@ -651,6 +652,14 @@ export default function Plan({
                     />
                   )}
                 </g>
+                {i.kind === "light" && (
+                  <circle
+                    r={Math.max(i.width, i.depth) * 0.7}
+                    fill={i.light?.enabled ? i.light.color : "#8a92a3"}
+                    stroke="#4c59e8"
+                    strokeWidth=".035"
+                  />
+                )}
                 <line
                   x1={-i.width * 0.35}
                   x2={i.width * 0.35}

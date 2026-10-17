@@ -1,3 +1,7 @@
+import { LightingPanel, LightInspector } from "./LightingPanel";
+import ArchitecturePanel from "./ArchitecturePanel";
+import { createLight, roomLightPoint, type lightPresets } from "./lightSources";
+import { MAX_LIGHTS } from "./lighting";
 import { useMediaQuery, useTouchDevice } from "./useDevice";
 import TouchVisit, { useTouchWalk } from "./TouchVisit";
 import { useCloudSync } from "./useCloudSync";
@@ -19,6 +23,8 @@ import {
 } from "react";
 import {
   Armchair,
+  Lightbulb,
+  Moon,
   AlertTriangle,
   ArrowDownToLine,
   ArrowUpRight,
@@ -137,14 +143,12 @@ export default function App() {
     [showCollisions, setShowCollisions] = useState(true),
     [transparent, setTransparent] = useState(true),
     [ceiling, setCeiling] = useState(false),
+    [showLightMarkers, setShowLightMarkers] = useState(true),
     [quality, setQuality] = useState(false),
     [realistic, setRealistic] = useState(
       () => readRenderPreferences().realistic,
     ),
-    [lighting, setLighting] = useState<LightingProfile>(
-      () => readRenderPreferences().lighting,
-    ),
-    [exposure, setExposure] = useState(() => readRenderPreferences().exposure),
+    [renderDefaults] = useState(readRenderPreferences),
     [eyeHeight, setEyeHeight] = useState(1.55),
     [fieldOfView, setFieldOfView] = useState(72),
     [walkSpeed, setWalkSpeed] = useState(1.4),
@@ -168,6 +172,44 @@ export default function App() {
     [busy, setBusy] = useState(false),
     [busyStage, setBusyStage] = useState("Traitement en cours…"),
     [url, setUrl] = useState("");
+  const lighting = p.environment?.lighting ?? renderDefaults.lighting;
+  const exposure = p.environment?.exposure ?? renderDefaults.exposure;
+  const [experience, setExperience] = useState<"simple" | "pro">(() =>
+    localStorage.getItem("krasroom-experience") === "pro" ? "pro" : "simple",
+  );
+  useEffect(() => {
+    localStorage.setItem("krasroom-experience", experience);
+  }, [experience]);
+  function setLighting(value: LightingProfile) {
+    change((p) => {
+      p.environment = { lighting: value, exposure };
+    });
+  }
+  function setExposure(value: number) {
+    change((p) => {
+      p.environment = { lighting, exposure: value };
+    });
+  }
+  function openLighting() {
+    setTab("lighting");
+    setLibraryExpanded(true);
+    if (compact) setMobilePanel("library");
+  }
+  function addLight(preset: keyof typeof lightPresets, roomId: string) {
+    if (p.items.filter((i) => i.kind === "light").length >= MAX_LIGHTS) {
+      notify(`Maximum ${MAX_LIGHTS} sources par appartement.`);
+      return;
+    }
+    const room = p.rooms.find((r) => r.id === roomId);
+    const point = room ? roomLightPoint(room) : visitStart(p);
+    const source = createLight(preset);
+    add(source, point);
+    setView("3d");
+    setHide(false);
+    notify(
+      "Lumière ajoutée. Déplacez-la comme un meuble ; ses propriétés règlent sa hauteur et son ambiance.",
+    );
+  }
   const [workshopSection, setWorkshopSection] = useState<
     "create" | "clean" | "blender"
   >("create");
@@ -302,6 +344,13 @@ export default function App() {
     select(null);
   }
   function duplicate() {
+    if (
+      item?.kind === "light" &&
+      p.items.filter((i) => i.kind === "light").length >= MAX_LIGHTS
+    ) {
+      notify(`Maximum ${MAX_LIGHTS} sources par appartement.`);
+      return;
+    }
     if (item) {
       const id = uid();
       change((p) =>
@@ -409,9 +458,17 @@ export default function App() {
       notify("Modèle ajouté à l’appartement et enregistré dans Mes meubles.");
     } else notify("Copie nettoyée enregistrée dans Mes meubles.");
   }
-  function add(i: Item) {
+  function add(i: Item, point?: { x: number; y: number }) {
+    if (
+      i.kind === "light" &&
+      p.items.filter((v) => v.kind === "light").length >= MAX_LIGHTS
+    ) {
+      notify(`Maximum ${MAX_LIGHTS} sources par appartement.`);
+      return;
+    }
     const id = uid();
-    const position = view === "3d" ? visitStart(p) : { x: i.x, y: i.y };
+    const position =
+      point || (view === "3d" ? visitStart(p) : { x: i.x, y: i.y });
     change((p) => p.items.push({ ...i, ...position, id }));
     select(id);
     setMobilePanel(null);
@@ -665,6 +722,28 @@ export default function App() {
             <Box size={21} />
             <span>Studio</span>
           </button>
+          <button
+            title="Lumières et ambiance"
+            aria-label="Lumières et ambiance"
+            aria-pressed={tab === "lighting" && libraryExpanded}
+            onClick={openLighting}
+          >
+            <Lightbulb size={21} />
+            <span>Lumières</span>
+          </button>
+          {experience === "pro" && (
+            <button
+              title="Dossier technique"
+              aria-label="Dossier technique"
+              onClick={() => {
+                setTab("build");
+                setLibraryExpanded(true);
+              }}
+            >
+              <Ruler size={20} />
+              <span>Technique</span>
+            </button>
+          )}
           <div className="rail-bottom">
             <span className="rail-monogram" aria-hidden="true">
               kr.
@@ -691,9 +770,11 @@ export default function App() {
             <h2>
               {tab === "build"
                 ? "Construire le plan"
-                : tab === "personal"
-                  ? "Ma collection"
-                  : "Le mobilier"}
+                : tab === "lighting"
+                  ? "La lumière"
+                  : tab === "personal"
+                    ? "Ma collection"
+                    : "Le mobilier"}
             </h2>
           </div>
           <div className="tabs">
@@ -718,9 +799,45 @@ export default function App() {
               <Box size={16} />
               Mes meubles
             </button>
+            <button
+              className={tab === "lighting" ? "active" : ""}
+              onClick={openLighting}
+              title="Éclairage"
+            >
+              <Lightbulb size={16} />
+              <span className="lighting-tab-label">Lumières</span>
+            </button>
           </div>
+          <label className="experience-switch">
+            Interface
+            <select
+              aria-label="Niveau d’interface"
+              value={experience}
+              onChange={(e) => {
+                const value = e.target.value as "simple" | "pro";
+                setExperience(value);
+                if (value === "pro") setTab("build");
+              }}
+            >
+              <option value="simple">Simple · l’essentiel</option>
+              <option value="pro">Pro · outils de précision</option>
+            </select>
+          </label>
           <div className="library-scroll">
-            {tab === "build" ? (
+            {tab === "lighting" ? (
+              <LightingPanel
+                lighting={lighting}
+                onLighting={(value) => {
+                  setLighting(value);
+                  setView("3d");
+                }}
+                onAdd={addLight}
+                onSelect={(id) => {
+                  select(id);
+                  if (compact) setMobilePanel("properties");
+                }}
+              />
+            ) : tab === "build" ? (
               <>
                 <button
                   className="primary full"
@@ -736,6 +853,9 @@ export default function App() {
                   Déposez votre plan et sa surface. KrasRoom propose
                   automatiquement les murs, pièces et ouvertures.
                 </p>
+                {experience === "pro" && (
+                  <ArchitecturePanel onMessage={notify} />
+                )}
                 <p className="section-label">CORRIGER OU AJUSTER</p>
                 <div className="tool-list">
                   {[
@@ -776,6 +896,34 @@ export default function App() {
               </>
             ) : (
               <>
+                {experience === "simple" && (
+                  <details className="quick-start">
+                    <summary>Prise en main · 3 gestes</summary>
+                    <ol>
+                      <li>
+                        Choisissez un meuble, puis glissez-le dans le plan ou la
+                        3D.
+                      </li>
+                      <li>
+                        Cliquez dessus pour changer ses dimensions et sa
+                        position.
+                      </li>
+                      <li>
+                        Ouvrez Lumières pour créer une ambiance de jour ou de
+                        nuit.
+                      </li>
+                    </ol>
+                    <button
+                      className="outline full"
+                      onClick={() => {
+                        setAutoFile(undefined);
+                        setModal("autoPlan");
+                      }}
+                    >
+                      Commencer avec mon plan
+                    </button>
+                  </details>
+                )}
                 <div className="search">
                   <Search size={16} />
                   <input
@@ -911,7 +1059,7 @@ export default function App() {
             )}
           </div>
           <div className="library-footer">
-            {tab !== "build" && (
+            {tab !== "build" && tab !== "lighting" && (
               <>
                 <button
                   className="primary full"
@@ -987,6 +1135,20 @@ export default function App() {
               </button>
             </div>
             <div className="viewport-actions">
+              <button
+                title={
+                  lighting === "night"
+                    ? "Passer l’appartement en jour"
+                    : "Passer l’appartement en nuit"
+                }
+                aria-pressed={lighting === "night"}
+                onClick={() => {
+                  setLighting(lighting === "night" ? "daylight" : "night");
+                  if (view === "2d") setView("3d");
+                }}
+              >
+                {lighting === "night" ? <Sun size={17} /> : <Moon size={17} />}
+              </button>
               <button
                 aria-label="Alertes de chevauchement"
                 aria-pressed={showCollisions}
@@ -1126,6 +1288,7 @@ export default function App() {
                     snap={snap}
                     transparent={transparent}
                     ceiling={ceiling}
+                    showLightMarkers={showLightMarkers}
                     hide={hide}
                     showCollisions={showCollisions}
                     quality={quality}
@@ -1285,7 +1448,7 @@ export default function App() {
                       </option>
                     </select>
                   </label>
-                  {realistic && (
+                  {
                     <>
                       <label>
                         Lumière{" "}
@@ -1317,7 +1480,7 @@ export default function App() {
                         <span>{exposure.toFixed(2)}</span>
                       </label>
                     </>
-                  )}
+                  }
                   <label>
                     <input
                       type="checkbox"
@@ -1333,6 +1496,14 @@ export default function App() {
                       onChange={(e) => setCeiling(e.target.checked)}
                     />
                     Plafond
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={showLightMarkers}
+                      onChange={(e) => setShowLightMarkers(e.target.checked)}
+                    />
+                    Repères des lumières
                   </label>
                   <label>
                     <input
@@ -1364,7 +1535,10 @@ export default function App() {
             </span>
             <span>
               {p.rooms.length} pièces · {totalArea.toFixed(1)} m² ·{" "}
-              {p.items.length} meubles
+              {p.items.filter((i) => i.kind !== "light").length} meubles
+              {p.items.some((i) => i.kind === "light")
+                ? ` · ${p.items.filter((i) => i.kind === "light").length} lumières`
+                : ""}
             </span>
             <span>{snap ? "Magnétisme activé" : "Placement libre"}</span>
           </footer>
@@ -1381,7 +1555,9 @@ export default function App() {
           <div className="right-heading">
             <h3>
               {item
-                ? "Votre meuble"
+                ? item.light
+                  ? "Votre lumière"
+                  : "Votre meuble"
                 : wall
                   ? "Votre mur"
                   : room
@@ -1407,7 +1583,9 @@ export default function App() {
                 )}
               </div>
               <div className="inspector-section-label">
-                01 — Objet & dimensions
+                {item.light
+                  ? "01 — Source & ambiance"
+                  : "01 — Objet & dimensions"}
               </div>
               <label className="field">
                 Nom
@@ -1416,18 +1594,23 @@ export default function App() {
                   onChange={(e) => editItem("name", e.target.value)}
                 />
               </label>
-              <DimensionsEditor
-                key={item.id}
-                item={item}
-                onPatch={(patch) =>
-                  change((p) => {
-                    Object.assign(
-                      p.items.find((i) => i.id === item.id)!,
-                      patch,
-                    );
-                  })
-                }
-              />
+              {item.light && (
+                <LightInspector item={item} pro={experience === "pro"} />
+              )}
+              {!item.light && (
+                <DimensionsEditor
+                  key={item.id}
+                  item={item}
+                  onPatch={(patch) =>
+                    change((p) => {
+                      Object.assign(
+                        p.items.find((i) => i.id === item.id)!,
+                        patch,
+                      );
+                    })
+                  }
+                />
+              )}
               {item.asset && (
                 <button
                   className="outline full"
@@ -1476,14 +1659,16 @@ export default function App() {
                   -360,
                   360,
                 )}
-                <label className="field">
-                  Couleur
-                  <input
-                    type="color"
-                    value={item.color}
-                    onChange={(e) => editItem("color", e.target.value)}
-                  />
-                </label>
+                {!item.light && (
+                  <label className="field">
+                    Couleur
+                    <input
+                      type="color"
+                      value={item.color}
+                      onChange={(e) => editItem("color", e.target.value)}
+                    />
+                  </label>
+                )}
               </div>
               {showCollisions && collides(item, p) && (
                 <p className="warning">
@@ -1954,7 +2139,9 @@ export default function App() {
                 </div>
                 <div>
                   <span>Meubles</span>
-                  <strong>{p.items.length}</strong>
+                  <strong>
+                    {p.items.filter((i) => i.kind !== "light").length}
+                  </strong>
                 </div>
               </div>
               <div className="tip">
@@ -1992,6 +2179,10 @@ export default function App() {
         >
           <Box size={20} />
           Studio mobilier
+        </button>
+        <button onClick={openLighting} aria-label="Ouvrir les lumières">
+          <Lightbulb size={20} />
+          Lumières
         </button>
         <button
           aria-expanded={mobilePanel === "properties"}

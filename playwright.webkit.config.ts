@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 import base from "./playwright.config";
 export default defineConfig({
   ...base,
-  testMatch: ["**/mobile.e2e.ts", "**/workshop.e2e.ts"],
+  testMatch: ["**/mobile.e2e.ts", "**/workshop.e2e.ts", "**/lighting.e2e.ts"],
   grep: /téléphone :/,
   use: {
     ...base.use,

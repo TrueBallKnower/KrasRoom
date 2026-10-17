@@ -1,0 +1,267 @@
+.experience-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 10px;
+  margin: 0 0 16px;
+}
+.experience-switch select {
+  max-width: 195px;
+  font-size: 10px;
+  padding: 7px;
+}
+.lighting-tab-label {
+  display: none;
+}
+.panel-intro {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+.day-night-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  border-radius: 10px;
+  margin-bottom: 22px;
+}
+.day-night-switch button {
+  min-height: 42px;
+  font-size: 12px;
+}
+.day-night-switch button[aria-pressed="true"] {
+  background: var(--green);
+  color: white;
+}
+.light-presets {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+}
+.light-presets > button {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  text-align: left;
+  justify-content: stretch;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 13px;
+  gap: 4px 10px;
+}
+.light-presets svg {
+  grid-row: span 2;
+  color: var(--green);
+  align-self: center;
+}
+.light-presets strong {
+  font-size: 12px;
+  font-weight: 550;
+}
+.light-presets small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.light-empty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.light-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 16px 0;
+}
+.light-list > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 9px;
+}
+.light-list button {
+  justify-content: flex-start;
+  flex: 1;
+  font-size: 11px;
+  padding: 6px 0;
+  text-align: left;
+}
+.light-list button small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 9px;
+}
+.light-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid #7581a04d;
+  flex-shrink: 0;
+}
+.light-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.light-inspector input[type="range"] {
+  width: 100%;
+  padding: 0;
+  accent-color: var(--green);
+  min-height: 28px !important;
+}
+.light-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin: 18px 0;
+}
+.light-swatches button {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 2px;
+  font-size: 9px;
+}
+.light-swatches button > span {
+  width: 23px;
+  height: 23px;
+  border: 1px solid #7581a033;
+  border-radius: 50%;
+}
+.light-swatches button[aria-pressed="true"] {
+  border-color: var(--green);
+  background: var(--tint);
+}
+.light-pro-controls {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 5px;
+}
+.pro-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--green);
+}
+.pro-heading h3 {
+  font-size: 14px;
+  margin: 0;
+  color: var(--ink);
+  font-weight: 550;
+}
+.pro-heading > span {
+  margin-left: auto;
+  font-size: 8px;
+  padding: 4px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.architecture-panel {
+  padding: 18px 0 24px;
+  margin: 20px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.quantity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 18px 0;
+}
+.quantity-grid > div {
+  background: var(--soft);
+  border-radius: 7px;
+  padding: 12px 9px;
+}
+.quantity-grid dt {
+  font-size: 9px;
+  color: var(--muted);
+}
+.quantity-grid dd {
+  margin: 8px 0 0;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.quantity-grid small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.wall-standards {
+  margin-top: 20px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+}
+.wall-standards > summary {
+  font-size: 11px;
+  cursor: pointer;
+}
+.quick-start {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 13px;
+}
+.quick-start > summary {
+  cursor: pointer;
+  color: var(--ink);
+}
+.quick-start ol {
+  line-height: 1.8;
+  padding-left: 19px;
+}
+[data-theme="dark"] .day-night-switch button[aria-pressed="true"] {
+  background: #4c59e8;
+}
+@media (max-width: 1100px), (pointer: coarse) and (max-width: 1400px) {
+  .light-list button,
+  .experience-switch select {
+    min-height: 40px;
+  }
+  .light-toggle input,
+  .light-list input {
+    min-width: 20px;
+    min-height: 20px;
+  }
+  .light-swatches button {
+    min-height: 50px;
+  }
+  .mobile-nav button {
+    min-width: 0;
+    font-size: 10px;
+  }
+}
+
+.app > .toast {
+  background: #202d52;
+  color: #fff;
+}
+
+.app .left .tabs > button:last-child {
+  flex: 0 0 30px;
+  padding: 9px 5px;
+}
+@media (min-width: 1101px) and (pointer: fine), (min-width: 1401px) {
+  .app .left .tabs > button:not(:last-child) > svg {
+    display: none;
+  }
+  .app .left .tabs > button:not(:last-child) {
+    padding: 10px 4px;
+  }
+}

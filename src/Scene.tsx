@@ -1,3 +1,6 @@
+import SceneLight from "./SceneLight";
+import { shadowSourceIds } from "./lightSources";
+import { MAX_LIGHTS } from "./lighting";
 import { useTouchDevice } from "./useDevice";
 import Walk from "./VisitCamera";
 import {
@@ -69,9 +72,11 @@ const FabricContext = createContext<ReturnType<typeof surfaceMaps> | null>(
 function StudioLighting({
   realistic,
   exposure,
+  night,
 }: {
   realistic: boolean;
   exposure: number;
+  night: boolean;
 }) {
   const { scene, gl, invalidate } = useThree();
   useEffect(() => {
@@ -90,7 +95,7 @@ function StudioLighting({
       room = new RoomEnvironment();
     const target = generator.fromScene(room, 0.04);
     scene.environment = target.texture;
-    scene.environmentIntensity = 0.7;
+    scene.environmentIntensity = night ? 0.015 : 0.7;
     return () => {
       scene.environment = old;
       scene.environmentIntensity = oldIntensity;
@@ -100,11 +105,11 @@ function StudioLighting({
       gl.toneMapping = oldTone;
       gl.toneMappingExposure = oldExposure;
     };
-  }, [scene, gl, realistic]);
+  }, [scene, gl, realistic, night]);
   useEffect(() => {
-    gl.toneMappingExposure = realistic ? exposure : 1;
+    gl.toneMappingExposure = exposure;
     invalidate();
-  }, [gl, realistic, exposure, invalidate]);
+  }, [gl, realistic, exposure, night, invalidate]);
   return null;
 }
 function Box({
@@ -525,6 +530,12 @@ function DropFurniture() {
           ),
           camera,
         );
+        if (
+          i.kind === "light" &&
+          useStore.getState().project.items.filter((v) => v.kind === "light")
+            .length >= MAX_LIGHTS
+        )
+          return;
         const q = ray.ray.intersectPlane(
           new Plane(new Vector3(0, 1, 0), 0),
           new Vector3(),
@@ -562,7 +573,9 @@ export default function Scene({
   showCollisions = true,
   lighting = "daylight",
   exposure = 1.05,
+  showLightMarkers = true,
 }: {
+  showLightMarkers?: boolean;
   lighting?: LightingProfile;
   exposure?: number;
   realistic?: boolean;
@@ -583,6 +596,14 @@ export default function Scene({
   const { project: p, selected, select, change } = useStore();
   const touchDevice = useTouchDevice();
   const light = lightingProfiles[lighting];
+  const night = lighting === "night";
+  const localShadows = shadowSourceIds(p);
+  const activeLights = new Set(
+    p.items
+      .filter((i) => i.kind === "light")
+      .slice(0, MAX_LIGHTS)
+      .map((i) => i.id),
+  );
   const fabricTexture = useSurfaceMaps("fabric", 1, 0, realistic);
   const bounds = useMemo(() => {
     const points = [
@@ -794,16 +815,20 @@ export default function Scene({
     >
       <RealismContext.Provider value={realistic}>
         <FabricContext.Provider value={fabricTexture}>
-          <StudioLighting realistic={realistic} exposure={exposure} />
+          <StudioLighting
+            realistic={realistic}
+            exposure={exposure}
+            night={night}
+          />
           {!walk && <NavigationCamera key={p.id} id={p.id} bounds={bounds} />}
           <DropFurniture />
-          <color attach="background" args={["#e8eae6"]} />
-          <ambientLight intensity={realistic ? light.ambient : 1.1} />
+          <color attach="background" args={[night ? "#101628" : "#e8eae6"]} />
+          <ambientLight intensity={night || realistic ? light.ambient : 1.1} />
           <hemisphereLight
             args={[
-              realistic ? light.sky : "#f9f6ef",
-              realistic ? light.ground : "#8b9b8a",
-              realistic ? light.hemisphere : 1,
+              night || realistic ? light.sky : "#f9f6ef",
+              night || realistic ? light.ground : "#8b9b8a",
+              night || realistic ? light.hemisphere : 1,
             ]}
           />
           {realistic && (
@@ -820,7 +845,7 @@ export default function Scene({
               bounds.y + 5,
             ]}
             color={realistic ? light.color : "#ffffff"}
-            intensity={realistic ? light.sun : 2}
+            intensity={night || realistic ? light.sun : 2}
             castShadow
             shadow-mapSize={quality ? 2048 : 1024}
             shadow-camera-left={-Math.max(12, bounds.span)}
@@ -854,8 +879,9 @@ export default function Scene({
               transparent={transparent && !walk}
             />
           ))}
-          {!hide &&
-            p.items.map((i) => {
+          {p.items
+            .filter((i) => !hide || i.kind === "light")
+            .map((i) => {
               const collision =
                 drag?.id === i.id ? previewCollision : collisionIds.has(i.id);
               return (
@@ -930,7 +956,15 @@ export default function Scene({
                   }}
                 >
                   <Suspense fallback={null}>
-                    {i.asset ? (
+                    {i.kind === "light" && i.light ? (
+                      <SceneLight
+                        markers={showLightMarkers && !walk}
+                        item={i}
+                        shadow={localShadows.has(i.id)}
+                        quality={quality}
+                        active={activeLights.has(i.id)}
+                      />
+                    ) : i.asset ? (
                       <Model i={i} onError={onError} />
                     ) : (
                       <BuiltIn i={i} />
@@ -985,7 +1019,7 @@ export default function Scene({
               position={[bounds.x, 0.005, bounds.y]}
               scale={Math.max(12, bounds.span * 1.8)}
               resolution={quality ? 512 : 256}
-              opacity={realistic ? 0.4 : 0.3}
+              opacity={night ? 0.1 : realistic ? 0.4 : 0.3}
               blur={2.5}
               far={5}
             />
