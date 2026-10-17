@@ -51,7 +51,7 @@ export default function StudioScene({
       dpr={[1, 1.5]}
       camera={{ position: [3, 2.5, 3], near: 0.01, far: 2000 }}
     >
-      <color attach="background" args={[dark ? "#141d30" : "#eef2f7"]} />
+      <color attach="background" args={[dark ? "#18201f" : "#e9eae4"]} />
       <ambientLight intensity={1.7} />
       <directionalLight position={[4, 7, 5]} intensity={2} />
       <directionalLight position={[-4, 3, -3]} intensity={0.8} />

@@ -535,13 +535,23 @@ export default function App() {
           <span className="brand-mark">
             <Home size={21} />
           </span>
-          KrasRoom<span className="beta">LOCAL</span>
+          KrasRoom<span className="beta">INTÉRIEURS</span>
         </a>
         <nav className="workspace-sections" aria-label="Espaces KrasRoom">
           <span aria-current="page">
             <Home size={15} />
             Appartement
           </span>
+          <button
+            aria-label="Ouvrir le mobilier"
+            onClick={() => {
+              setTab("catalog");
+              if (compact) setMobilePanel("library");
+            }}
+          >
+            <Armchair size={15} />
+            Mobilier
+          </button>
           <button
             onClick={() => {
               setWorkshopSection("create");
@@ -643,13 +653,13 @@ export default function App() {
             <X size={20} />
           </button>
           <div className="sidebar-heading">
-            <span>ÉDITEUR D’INTÉRIEUR</span>
+            <span>MATIÈRES & OBJETS</span>
             <h2>
               {tab === "build"
                 ? "Construire le plan"
                 : tab === "personal"
                   ? "Ma collection"
-                  : "Meubler & décorer"}
+                  : "Le mobilier"}
             </h2>
           </div>
           <div className="tabs">
@@ -1339,7 +1349,7 @@ export default function App() {
                   ? "Votre mur"
                   : room
                     ? "Votre pièce"
-                    : "Les détails font la différence"}
+                    : "Votre espace"}
             </h3>
             <span className="section-label">PROPRIÉTÉS</span>
             <button
@@ -1882,10 +1892,10 @@ export default function App() {
             <>
               <div className="empty-selection">
                 <MousePointer2 size={28} />
-                <h4>Faites de la place à vos idées.</h4>
+                <h4>Tout commence par une sélection.</h4>
                 <p>
-                  Sélectionnez un meuble, un mur ou une pièce pour ajuster
-                  chaque détail.
+                  Cliquez sur un meuble, un mur ou un sol. Ses dimensions et ses
+                  matériaux apparaîtront ici.
                 </p>
               </div>
               <div className="project-summary">
@@ -1904,10 +1914,10 @@ export default function App() {
                 </div>
               </div>
               <div className="tip">
-                <span>✦</span>
+                <Ruler size={18} aria-hidden="true" />
                 <p>
-                  Commencez par votre plan, puis imaginez votre intérieur. Tout
-                  est enregistré automatiquement.
+                  Les dimensions sont en mètres. Vos modifications sont
+                  enregistrées automatiquement sur cet appareil.
                 </p>
               </div>
             </>

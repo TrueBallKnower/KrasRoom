@@ -136,9 +136,9 @@
   display: grid;
   place-items: center;
   border-radius: 14px;
-  background: linear-gradient(145deg, #749fff, #4a6ce1);
+  background: var(--green);
   color: #fff;
-  box-shadow: 0 5px 15px #5278df25;
+  box-shadow: none;
 }
 .studio-brand h1 {
   font-size: 18px;
@@ -280,8 +280,12 @@
   background: var(--bg);
 }
 .studio-use {
-  background: linear-gradient(130deg, #4c88fa, #3b6ee3);
+  background: var(--green);
   color: #fff;
+}
+[data-theme="dark"] .studio-use,
+[data-theme="dark"] .studio-brand > span {
+  background: #39777a;
 }
 .creator-body {
   flex: 1;
@@ -355,7 +359,7 @@
   color: var(--muted);
 }
 .studio-templates button:hover {
-  border-color: #a9c2f4;
+  border-color: var(--green);
   color: var(--green);
 }
 .studio-template-select {
@@ -434,7 +438,7 @@
   min-height: 0;
   position: relative;
   overflow: hidden;
-  background: #eef2f7;
+  background: var(--workspace);
 }
 .studio-stage .creator-preview {
   position: absolute;
@@ -630,7 +634,7 @@
 .studio-status i {
   width: 5px;
   height: 5px;
-  background: #b4bfce;
+  background: var(--muted);
   border-radius: 50%;
 }
 .studio-status .studio-saved i {
