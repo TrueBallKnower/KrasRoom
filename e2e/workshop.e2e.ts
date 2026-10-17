@@ -26,7 +26,7 @@ test("atelier : créer, conserver le brouillon, exporter et importer un vrai GLB
       exact: true,
     })
     .click();
-  const modal = page.getByRole("dialog");
+  const modal = page.getByRole("main", { name: "Studio mobilier" });
   await modal
     .getByLabel("Nom de la création", { exact: true })
     .fill("Table du bureau");
@@ -64,7 +64,9 @@ test("atelier : créer, conserver le brouillon, exporter et importer un vrai GLB
   expect(recipe.parts).toHaveLength(6);
   expect(recipe.parts[0].width).toBe(1.8);
   expect(json.meshes).toHaveLength(6);
-  await modal.getByRole("button", { name: "Fermer", exact: true }).click();
+  await modal
+    .getByRole("button", { name: "Retour à l’appartement", exact: true })
+    .click();
   await page
     .getByRole("button", {
       name: "Atelier 3D · créer et importer",
@@ -98,8 +100,20 @@ test("atelier : créer, conserver le brouillon, exporter et importer un vrai GLB
   await expect(
     modal.getByLabel("Nom de la création", { exact: true }),
   ).toHaveValue("Table du bureau");
+  await expect(
+    modal.getByRole("button", {
+      name: "Reprendre la création sélectionnée",
+      exact: true,
+    }),
+  ).toBeEnabled();
   await page.keyboard.press("Delete");
-  await expect(page.locator("footer")).toContainText("6 meubles");
+  await expect(
+    modal.getByLabel("Forme sélectionnée", { exact: true }).locator("option"),
+  ).toHaveCount(5);
+  await page.keyboard.press("Control+z");
+  await expect(
+    modal.getByLabel("Forme sélectionnée", { exact: true }).locator("option"),
+  ).toHaveCount(6);
   await modal
     .getByRole("button", { name: "Depuis Blender", exact: true })
     .click();
@@ -122,6 +136,7 @@ test("atelier : créer, conserver le brouillon, exporter et importer un vrai GLB
   });
   await expect(modal).toHaveCount(0);
   await expect(page.locator("footer")).toContainText("7 meubles");
+  await expect(page.locator(".saved")).toContainText("Enregistré");
   await page.reload();
   await expect(page.locator("footer")).toContainText("7 meubles");
 });
@@ -146,13 +161,17 @@ test("téléphone : créer un meuble léger, conserver ses dimensions et le retr
         exact: true,
       })
       .tap();
-    const modal = page.getByRole("dialog");
+    const modal = page.getByRole("main", { name: "Studio mobilier" });
+    await modal.getByRole("button", { name: "Composants", exact: true }).tap();
     await modal
       .getByLabel("Point de départ", { exact: true })
       .selectOption("empty");
     await modal
       .getByLabel("Nom de la création", { exact: true })
       .fill("Meuble mobile");
+    await modal
+      .getByRole("button", { name: "Propriétés de la forme", exact: true })
+      .tap();
     await modal.getByLabel("Largeur de la forme", { exact: true }).fill("0.6");
     await modal.getByLabel("Hauteur de la forme", { exact: true }).fill("0.4");
     expect(
@@ -181,4 +200,97 @@ test("téléphone : créer un meuble léger, conserver ses dimensions et le retr
   } finally {
     await context.close();
   }
+});
+
+test("studio plein écran : déplacer un composant avec le gizmo, annuler et revenir à son appartement", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await page.goto("./");
+  await expect(page.locator(".saved")).toContainText("Enregistré");
+  await page
+    .getByRole("button", { name: "Studio mobilier", exact: true })
+    .first()
+    .click();
+  const studio = page.getByRole("main", { name: "Studio mobilier" });
+  await expect(page).toHaveURL(/#studio$/);
+  await expect(page.locator(".workspace")).toHaveCount(0);
+  await expect(page.locator(".modal-overlay")).toHaveCount(0);
+  await studio
+    .getByLabel("Point de départ", { exact: true })
+    .selectOption("empty");
+  const box = (await studio.locator(".creator-preview").boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(box.width).toBeGreaterThan(viewport.width * 0.5);
+  expect(box.height).toBeGreaterThan(viewport.height * 0.6);
+  await expect(studio.locator("canvas")).toHaveCount(1);
+  await studio.getByRole("button", { name: "Face", exact: true }).click();
+  await studio.locator("canvas").screenshot();
+  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(center.x + 35, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 115, center.y, { steps: 12 });
+  await page.mouse.up();
+  await expect(
+    studio.getByLabel("Position X de la forme", { exact: true }),
+  ).not.toHaveValue("0");
+  await studio
+    .getByRole("button", { name: "Annuler la création", exact: true })
+    .click();
+  await expect(
+    studio.getByLabel("Position X de la forme", { exact: true }),
+  ).toHaveValue("0");
+  await studio
+    .getByRole("button", { name: "Redimensionner la forme", exact: true })
+    .click();
+  await studio.locator("canvas").screenshot();
+  await page.mouse.move(center.x + 35, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 95, center.y, { steps: 12 });
+  await page.mouse.up();
+  await expect(
+    studio.getByLabel("Largeur de la forme", { exact: true }),
+  ).not.toHaveValue("1");
+  await studio
+    .getByRole("button", { name: "Annuler la création", exact: true })
+    .click();
+  await expect(
+    studio.getByLabel("Largeur de la forme", { exact: true }),
+  ).toHaveValue("1");
+  await studio
+    .getByRole("button", { name: "Tourner la forme", exact: true })
+    .click();
+  await expect(
+    studio.getByRole("button", { name: "Tourner la forme", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await studio
+    .getByRole("button", { name: "Plein écran du studio", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        document.fullscreenElement?.classList.contains("studio-workspace"),
+      ),
+    )
+    .toBe(true);
+  await studio
+    .getByRole("button", { name: "Plein écran du studio", exact: true })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => document.fullscreenElement === null))
+    .toBe(true);
+  await studio
+    .getByRole("button", { name: "Retour à l’appartement", exact: true })
+    .click();
+  await expect(studio).toHaveCount(0);
+  await expect(page.locator("footer")).toContainText("5 meubles");
+  await expect(page).not.toHaveURL(/#studio$/);
+  await page
+    .getByRole("button", { name: "Studio mobilier", exact: true })
+    .first()
+    .click();
+  await expect(studio).toBeVisible();
+  await page.goBack();
+  await expect(studio).toHaveCount(0);
+  await expect(page.locator("footer")).toContainText("5 meubles");
 });

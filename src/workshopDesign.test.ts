@@ -9,6 +9,8 @@ import {
   validateDesign,
   designFromModel,
   DESIGN_LIMIT,
+  furnitureComponent,
+  transformedPart,
 } from "./workshopDesign";
 import { loadDesignDraft, saveDesignDraft } from "./workshopDraft";
 describe("Création de meubles en mètres", () => {
@@ -59,5 +61,46 @@ describe("Création de meubles en mètres", () => {
     d.parts = [designPart()];
     d.parts.push({ ...d.parts[0] });
     expect(() => validateDesign(d)).toThrow();
+  });
+  it("propose des assemblages de mobilier valides et des composants aux bonnes dimensions", () => {
+    for (const kind of [
+      "table",
+      "desk",
+      "shelf",
+      "cabinet",
+      "bench",
+      "empty",
+    ]) {
+      const d = designPreset(kind);
+      validateDesign(d);
+      const group = buildDesign(d);
+      expect(designSize(group).length()).toBeGreaterThan(0.1);
+      disposeDesign(group);
+    }
+    expect(furnitureComponent("leg").height).toBe(0.7);
+    expect(furnitureComponent("top").elevation).toBe(0.7);
+  });
+  it("convertit les gestes du gizmo en positions, dimensions et degrés sauvegardables", () => {
+    const p = designPart(),
+      g = buildDesign({ version: 1, name: "Test", parts: [p] }),
+      m = g.children[0];
+    m.position.set(0.4, 1, 0.6);
+    m.scale.set(2, 0.8, 0.7);
+    m.rotation.y = Math.PI / 2;
+    const next = transformedPart(p, m);
+    expect(next).toMatchObject({
+      x: 0.4,
+      z: 0.6,
+      elevation: 0.6,
+      width: 2,
+      height: 0.8,
+      depth: 0.7,
+      ry: 90,
+    });
+    validateDesign({ version: 1, name: "Test", parts: [next] });
+    m.scale.x = -0.001;
+    m.position.x = 99;
+    expect(transformedPart(p, m)).toMatchObject({ width: 0.01, x: 50 });
+    disposeDesign(g);
   });
 });

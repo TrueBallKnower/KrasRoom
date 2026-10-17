@@ -182,12 +182,15 @@ export default function App() {
       | "autoPlan"
       | "split"
       | "account"
-    >(null),
+    >(() => (location.hash === "#studio" ? "split" : null)),
     [allProjects, setAllProjects] = useState<Project[]>([]),
     [personal, setPersonal] = useState<Item[]>([]),
     [busy, setBusy] = useState(false),
     [busyStage, setBusyStage] = useState("Traitement en cours…"),
     [url, setUrl] = useState("");
+  const [workshopSection, setWorkshopSection] = useState<
+    "create" | "clean" | "blender"
+  >("create");
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -336,7 +339,7 @@ export default function App() {
       )
         return;
       if (modal) {
-        if (e.key === "Escape") setModal(null);
+        if (e.key === "Escape" && modal !== "split") setModal(null);
         return;
       }
       if (
@@ -495,6 +498,36 @@ export default function App() {
         (category === "Toutes" || c[5] === category) &&
         c[0].toLowerCase().includes(query.toLowerCase()),
     );
+  if (modal === "split")
+    return (
+      <Suspense
+        fallback={
+          <main className="studio-loading">Ouverture du Studio mobilier…</main>
+        }
+      >
+        <ModelWorkshop
+          item={item}
+          initialSection={workshopSection}
+          notice={message}
+          onDismissNotice={() => setMessage("")}
+          onExit={() => setModal(null)}
+          onCreate={(file) => storeWorkshopModel(file, true)}
+          onSaveLibrary={(file) => storeWorkshopModel(file, false)}
+          onSplit={(items) => {
+            if (!item) return;
+            change((p) => {
+              p.items = p.items.filter((i) => i.id !== item.id);
+              p.items.push(...items);
+            });
+            select(items[0]?.id || null);
+            setModal(null);
+            notify(
+              "Atelier appliqué. Annuler permet de retrouver le modèle initial.",
+            );
+          }}
+        />
+      </Suspense>
+    );
   return (
     <div className={immersive ? "app immersive-visit" : "app"}>
       <header>
@@ -504,6 +537,21 @@ export default function App() {
           </span>
           KrasRoom<span className="beta">LOCAL</span>
         </a>
+        <nav className="workspace-sections" aria-label="Espaces KrasRoom">
+          <span aria-current="page">
+            <Home size={15} />
+            Appartement
+          </span>
+          <button
+            onClick={() => {
+              setWorkshopSection("create");
+              setModal("split");
+            }}
+          >
+            <Box size={15} />
+            Studio mobilier
+          </button>
+        </nav>
         <div className="project-title">
           <button onClick={openProjects}>
             <Folder size={16} />
@@ -816,7 +864,10 @@ export default function App() {
               )}
               <button
                 className="outline full"
-                onClick={() => setModal("split")}
+                onClick={() => {
+                  setWorkshopSection("create");
+                  setModal("split");
+                }}
               >
                 Atelier 3D · créer et importer
               </button>
@@ -1330,7 +1381,10 @@ export default function App() {
               {item.asset && (
                 <button
                   className="outline full"
-                  onClick={() => setModal("split")}
+                  onClick={() => {
+                    setWorkshopSection("clean");
+                    setModal("split");
+                  }}
                 >
                   Atelier 3D · retirer le décor
                 </button>
@@ -1877,6 +1931,15 @@ export default function App() {
           <Armchair size={20} /> Bibliothèque
         </button>
         <button
+          onClick={() => {
+            setWorkshopSection("create");
+            setModal("split");
+          }}
+        >
+          <Box size={20} />
+          Studio mobilier
+        </button>
+        <button
           aria-expanded={mobilePanel === "properties"}
           onClick={() =>
             setMobilePanel(mobilePanel === "properties" ? null : "properties")
@@ -1960,7 +2023,7 @@ export default function App() {
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <section
-            className={modal === "split" ? "modal workshop-modal" : "modal"}
+            className="modal"
             role="dialog"
             aria-modal="true"
             aria-label="Gestion KrasRoom"
@@ -2095,26 +2158,6 @@ export default function App() {
                   Créer un appartement de démonstration
                 </button>
               </>
-            ) : modal === "split" ? (
-              <Suspense fallback={<p>Chargement de la structure…</p>}>
-                <ModelWorkshop
-                  item={item}
-                  onCreate={(file) => storeWorkshopModel(file, true)}
-                  onSaveLibrary={(file) => storeWorkshopModel(file, false)}
-                  onSplit={(items) => {
-                    if (!item) return;
-                    change((p) => {
-                      p.items = p.items.filter((i) => i.id !== item.id);
-                      p.items.push(...items);
-                    });
-                    select(items[0]?.id || null);
-                    setModal(null);
-                    notify(
-                      "Atelier appliqué. Annuler permet de retrouver le modèle initial.",
-                    );
-                  }}
-                />
-              </Suspense>
             ) : modal === "import" ? (
               <>
                 <span className="eyebrow">VOS MEUBLES, SANS LIMITE</span>
@@ -2125,7 +2168,10 @@ export default function App() {
                 </p>
                 <button
                   className="outline full"
-                  onClick={() => setModal("split")}
+                  onClick={() => {
+                    setWorkshopSection("create");
+                    setModal("split");
+                  }}
                 >
                   Ouvrir l’Atelier 3D · créer ou importer depuis Blender
                 </button>

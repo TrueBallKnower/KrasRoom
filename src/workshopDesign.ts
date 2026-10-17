@@ -66,6 +66,40 @@ export function designPreset(kind = "table"): Design {
         ),
       ],
     };
+  if (kind === "cabinet")
+    return {
+      version: 1,
+      name: "Mon meuble TV",
+      parts: [
+        part("Plateau supérieur", 1.6, 0.4, 0.04, 0, 0, 0.46),
+        part("Socle", 1.6, 0.4, 0.04, 0, 0, 0.08),
+        ...[-0.78, 0, 0.78].map((x, i) =>
+          part(`Panneau ${i + 1}`, 0.04, 0.4, 0.34, x, 0, 0.12),
+        ),
+        part("Fond", 1.6, 0.02, 0.42, 0, -0.19, 0.08),
+        ...[-0.65, 0.65].flatMap((x) =>
+          [-0.13, 0.13].map((z) => part("Pied", 0.05, 0.05, 0.08, x, z)),
+        ),
+      ],
+    };
+  if (kind === "bench")
+    return {
+      version: 1,
+      name: "Mon banc",
+      parts: [
+        part("Assise", 1.2, 0.4, 0.05, 0, 0, 0.4),
+        ...[-0.48, 0.48].map((x) => part("Piètement", 0.08, 0.34, 0.4, x)),
+      ],
+    };
+  if (kind === "desk")
+    return {
+      version: 1,
+      name: "Mon bureau",
+      parts: [
+        part("Plan de travail", 1.6, 0.7, 0.04, 0, 0, 0.72),
+        ...[-0.7, 0.7].map((x) => part("Piètement", 0.05, 0.6, 0.72, x)),
+      ],
+    };
   if (kind === "empty")
     return { version: 1, name: "Ma création", parts: [designPart()] };
   return {
@@ -167,4 +201,81 @@ export function designFromModel(scene: Object3D): Design | undefined {
     }
   });
   return design;
+}
+
+export function furnitureComponent(
+  kind: "top" | "leg" | "panel" | "handle" | "cushion",
+): DesignPart {
+  const p = designPart();
+  switch (kind) {
+    case "top":
+      return {
+        ...p,
+        name: "Plateau",
+        width: 1.2,
+        depth: 0.6,
+        height: 0.04,
+        elevation: 0.7,
+      };
+    case "leg":
+      return {
+        ...p,
+        name: "Pied",
+        shape: "cylinder",
+        width: 0.06,
+        depth: 0.06,
+        height: 0.7,
+        x: 0.4,
+        z: 0.2,
+      };
+    case "panel":
+      return {
+        ...p,
+        name: "Panneau",
+        width: 0.6,
+        depth: 0.04,
+        height: 0.8,
+        z: -0.25,
+      };
+    case "handle":
+      return {
+        ...p,
+        name: "Poignée",
+        width: 0.16,
+        depth: 0.03,
+        height: 0.02,
+        elevation: 0.55,
+        z: 0.28,
+        color: "#525b69",
+      };
+    case "cushion":
+      return {
+        ...p,
+        name: "Coussin",
+        width: 0.5,
+        depth: 0.5,
+        height: 0.12,
+        elevation: 0.45,
+        color: "#b9c1ce",
+      };
+  }
+}
+/** Commit a gizmo gesture once, with the same limits as numerical editing. */
+export function transformedPart(p: DesignPart, mesh: Object3D): DesignPart {
+  const clamp = (v: number, min: number, max: number) =>
+    Math.round(Math.max(min, Math.min(max, v)) * 1000) / 1000;
+  const angle = (v: number) => clamp(((v * 180) / Math.PI) % 360, -360, 360);
+  const height = clamp(Math.abs(mesh.scale.y), 0.01, 20);
+  return {
+    ...p,
+    x: clamp(mesh.position.x, -50, 50),
+    z: clamp(mesh.position.z, -50, 50),
+    elevation: clamp(mesh.position.y - height / 2, -50, 50),
+    width: clamp(Math.abs(mesh.scale.x), 0.01, 20),
+    depth: clamp(Math.abs(mesh.scale.z), 0.01, 20),
+    height,
+    rx: angle(mesh.rotation.x),
+    ry: angle(mesh.rotation.y),
+    rz: angle(mesh.rotation.z),
+  };
 }
