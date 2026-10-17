@@ -1,3 +1,4 @@
+import { walkObstacles } from "./visitMotion";
 import {
   distance,
   segmentDistance,
@@ -60,7 +61,8 @@ export function inside(q: Point, polygon: Point[]) {
   }
   return hit;
 }
-export function visitStart(p: Project): Point {
+export function visitStart(p: Project, eyeHeight = 1.55): Point {
+  const blocked = walkObstacles(p, eyeHeight, 0.4);
   let best: Point | undefined,
     score = -Infinity;
   for (const r of p.rooms) {
@@ -74,17 +76,7 @@ export function visitStart(p: Project): Point {
           ...p.walls.map((w) => segmentDistance(q, w.a, w.b) - w.thickness / 2),
           5,
         );
-        const blocked = p.items.some((i) => {
-          const a = (-i.rotation * Math.PI) / 180,
-            dx = x - i.x,
-            dy = y - i.y;
-          return (
-            Math.abs(dx * Math.cos(a) - dy * Math.sin(a)) <
-              i.width / 2 + 0.25 &&
-            Math.abs(dx * Math.sin(a) + dy * Math.cos(a)) < i.depth / 2 + 0.25
-          );
-        });
-        if (!blocked && clearance > score) {
+        if (!blocked(q) && clearance > score) {
           score = clearance;
           best = q;
         }

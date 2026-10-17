@@ -1,5 +1,5 @@
 import { useMediaQuery, useTouchDevice } from "./useDevice";
-import TouchVisit from "./TouchVisit";
+import TouchVisit, { useTouchWalk } from "./TouchVisit";
 import { useCloudSync } from "./useCloudSync";
 import { useCloud } from "./cloudState";
 import { useImmersiveVisit } from "./useImmersiveVisit";
@@ -168,6 +168,7 @@ export default function App() {
     [eyeHeight, setEyeHeight] = useState(1.55),
     [fieldOfView, setFieldOfView] = useState(72),
     [walkSpeed, setWalkSpeed] = useState(1.4),
+    [freeWalk, setFreeWalk] = useState(false),
     [message, setMessage] = useState(""),
     [persisted, setPersisted] = useState<Project | null>(null),
     [saveError, setSaveError] = useState(false),
@@ -1001,6 +1002,7 @@ export default function App() {
                     eyeHeight={eyeHeight}
                     fieldOfView={fieldOfView}
                     walkSpeed={walkSpeed}
+                    freeWalk={freeWalk}
                     snap={snap}
                     transparent={transparent}
                     ceiling={ceiling}
@@ -1070,12 +1072,15 @@ export default function App() {
                 <div className="canvas-hint">
                   {touch
                     ? view === "walk"
-                      ? "Glissez pour regarder · Maintenez les flèches pour avancer"
+                      ? "Joystick : marcher · Glissez pour regarder"
                       : "Un doigt : tourner ou déplacer un meuble · Deux doigts : déplacer la vue et zoomer"
                     : view === "walk"
-                      ? "Cliquez pour visiter · ZQSD / WASD pour avancer · L : masquer l’interface · Échap : libérer la souris"
+                      ? "Cliquez pour visiter · ZQSD / WASD : marcher · Maj : accélérer · L : masquer l’interface · Échap : libérer la souris"
                       : "Gauche : tourner / déplacer un meuble · Clic droit ou Espace + glisser : déplacer la vue · Molette : zoom au curseur"}
                 </div>
+                {view === "walk" && (
+                  <div className="visit-reticle" aria-hidden="true" />
+                )}
                 {view === "walk" && touch && <TouchVisit />}
                 {view === "walk" && (
                   <div className="visit-settings">
@@ -1124,6 +1129,20 @@ export default function App() {
                         <option value={2.2}>Rapide</option>
                       </select>
                     </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={freeWalk}
+                        onChange={(e) => setFreeWalk(e.target.checked)}
+                      />
+                      Traverser les obstacles
+                    </label>
+                    <button
+                      className="outline"
+                      onClick={() => useTouchWalk.getState().restart()}
+                    >
+                      Revenir au départ
+                    </button>
                     <small>
                       La perspective change, les dimensions restent en mètres.
                       Échap pour régler la visite.
@@ -2199,8 +2218,9 @@ export default function App() {
                 </p>
                 <p>
                   En visite : cliquez dans la scène, puis utilisez ZQSD ou WASD.
-                  Échap libère la souris. Ce mode n’empêche pas de traverser les
-                  murs.
+                  Maj pour accélérer. Sur écran tactile : joystick à gauche,
+                  glisser ailleurs pour regarder. Échap libère la souris. Ce
+                  mode n’empêche pas de traverser les murs.
                 </p>
                 <p>
                   Vos données restent dans ce navigateur et cet appareil.

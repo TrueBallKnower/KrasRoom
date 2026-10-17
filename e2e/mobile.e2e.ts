@@ -209,6 +209,36 @@ test("visite tactile : regarder au doigt, avancer sans clavier et quitter le ple
     await touch(client, "touchEnd", []);
     await expect(button).toHaveAttribute("aria-pressed", "false");
     expect(looked.equals(moved)).toBe(false);
+    const stick = page.getByRole("group", { name: "Joystick de déplacement" });
+    const j = (await stick.boundingBox())!;
+    const origin = { x: j.x + j.width / 2, y: j.y + j.height / 2, id: 5 };
+    await touch(client, "touchStart", [origin]);
+    const pushed = { ...origin, x: origin.x + 15, y: origin.y - 20 };
+    const look = {
+      x: box.x + box.width * 0.8,
+      y: box.y + box.height * 0.35,
+      id: 6,
+    };
+    await touch(client, "touchMove", [pushed]);
+    await expect(stick.locator(".touch-stick-track span")).not.toHaveAttribute(
+      "style",
+      /translate\(0px,\s*0px\)/,
+    );
+    await touch(client, "touchStart", [pushed, look]);
+    await touch(client, "touchMove", [pushed, { ...look, x: look.x - 35 }]);
+    await touch(client, "touchEnd", []);
+    await expect(stick.locator(".touch-stick-track span")).toHaveAttribute(
+      "style",
+      /translate\(0px,\s*0px\)/,
+    );
+    const rapid = page.getByRole("button", {
+      name: "Marche rapide",
+      exact: true,
+    });
+    await rapid.tap();
+    await expect(rapid).toHaveAttribute("aria-pressed", "true");
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await expect(rapid).toHaveAttribute("aria-pressed", "false");
     expect(
       await page.evaluate(() => document.pointerLockElement === null),
     ).toBe(true);

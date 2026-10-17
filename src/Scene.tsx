@@ -1,5 +1,5 @@
 import { useTouchDevice } from "./useDevice";
-import { useTouchWalk } from "./TouchVisit";
+import Walk from "./VisitCamera";
 import {
   Suspense,
   useEffect,
@@ -18,7 +18,6 @@ import {
 } from "@react-three/fiber";
 import {
   OrbitControls,
-  PointerLockControls,
   Grid,
   ContactShadows,
   RoundedBox,
@@ -26,7 +25,6 @@ import {
 } from "@react-three/drei";
 import {
   Box3,
-  Euler,
   PMREMGenerator,
   ACESFilmicToneMapping,
   NeutralToneMapping,
@@ -45,7 +43,7 @@ import { finishDefinition } from "./floorFinishes";
 import { surfaceMaps, useSurfaceMaps } from "./materials";
 import { magneticPlacement, type AlignmentGuide } from "./placement";
 import { wallPlacement } from "./wallPlacement";
-import { wallOutline, visitStart } from "./spatial";
+import { wallOutline } from "./spatial";
 import NavigationCamera from "./NavigationCamera";
 import { useNavigation } from "./navigation";
 import {
@@ -505,129 +503,6 @@ function Floor({ r, ceiling }: { r: Room; ceiling?: boolean }) {
     </mesh>
   );
 }
-function Walk({
-  eyeHeight,
-  fieldOfView,
-  speed,
-}: {
-  eyeHeight: number;
-  fieldOfView: number;
-  speed: number;
-}) {
-  const { camera, gl } = useThree();
-  const touch = useTouchDevice();
-  const p = useStore((s) => s.project);
-  const start = useMemo(() => visitStart(p), [p.id]);
-  const keys = useRef(new Set<string>());
-  const velocity = useRef(new Vector3());
-  useEffect(() => {
-    camera.position.set(start.x, eyeHeight, start.y);
-    camera.lookAt(start.x + 1, eyeHeight, start.y);
-  }, [camera, start]);
-  useEffect(() => {
-    if ("fov" in camera) {
-      (camera as import("three").PerspectiveCamera).fov = fieldOfView;
-      camera.updateProjectionMatrix();
-    }
-    camera.position.y = eyeHeight;
-  }, [camera, fieldOfView, eyeHeight]);
-  useEffect(() => {
-    const clear = () => {
-      keys.current.clear();
-      velocity.current.set(0, 0, 0);
-    };
-    const down = (e: KeyboardEvent) => {
-      if (document.pointerLockElement) {
-        e.preventDefault();
-        keys.current.add(e.code);
-      }
-    };
-    const up = (e: KeyboardEvent) => keys.current.delete(e.code);
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    window.addEventListener("blur", clear);
-    document.addEventListener("pointerlockchange", clear);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", clear);
-      document.removeEventListener("pointerlockchange", clear);
-    };
-  }, []);
-  useEffect(() => {
-    if (!touch) return;
-    const canvas = gl.domElement;
-    let pointer: { id: number; x: number; y: number } | undefined;
-    const down = (e: PointerEvent) => {
-      if (e.pointerType !== "touch" || pointer) return;
-      pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
-      canvas.setPointerCapture(e.pointerId);
-    };
-    const move = (e: PointerEvent) => {
-      if (!pointer || pointer.id !== e.pointerId) return;
-      const rotation = new Euler().setFromQuaternion(camera.quaternion, "YXZ");
-      rotation.y -= (e.clientX - pointer.x) * 0.005;
-      rotation.x = Math.max(
-        -1.35,
-        Math.min(1.35, rotation.x - (e.clientY - pointer.y) * 0.005),
-      );
-      camera.quaternion.setFromEuler(rotation);
-      pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
-    };
-    const up = (e: PointerEvent) => {
-      if (e.pointerId === pointer?.id) pointer = undefined;
-    };
-    const reset = () => {
-      pointer = undefined;
-    };
-    canvas.addEventListener("pointerdown", down);
-    canvas.addEventListener("pointermove", move);
-    canvas.addEventListener("pointerup", up);
-    canvas.addEventListener("pointercancel", up);
-    canvas.addEventListener("lostpointercapture", up);
-    window.addEventListener("blur", reset);
-    document.addEventListener("visibilitychange", reset);
-    return () => {
-      canvas.removeEventListener("pointerdown", down);
-      canvas.removeEventListener("pointermove", move);
-      canvas.removeEventListener("pointerup", up);
-      canvas.removeEventListener("pointercancel", up);
-      canvas.removeEventListener("lostpointercapture", up);
-      window.removeEventListener("blur", reset);
-      document.removeEventListener("visibilitychange", reset);
-      useTouchWalk.getState().move(0, 0);
-    };
-  }, [touch, gl, camera]);
-  useFrame((_, delta) => {
-    if (!document.pointerLockElement && !touch) return;
-    const dt = Math.min(delta, 0.05),
-      k = keys.current;
-    const forward = camera.getWorldDirection(new Vector3());
-    forward.y = 0;
-    forward.normalize();
-    const right = forward.clone().cross(new Vector3(0, 1, 0));
-    const direction = new Vector3();
-    if (k.has("KeyW") || k.has("KeyZ") || k.has("ArrowUp"))
-      direction.add(forward);
-    if (k.has("KeyS") || k.has("ArrowDown")) direction.sub(forward);
-    if (k.has("KeyD") || k.has("ArrowRight")) direction.add(right);
-    if (k.has("KeyA") || k.has("KeyQ") || k.has("ArrowLeft"))
-      direction.sub(right);
-    if (touch) {
-      const movement = useTouchWalk.getState();
-      direction
-        .addScaledVector(forward, movement.y)
-        .addScaledVector(right, movement.x);
-    }
-    direction.normalize().multiplyScalar(speed);
-    velocity.current.lerp(direction, 1 - Math.exp(-12 * dt));
-    camera.position.addScaledVector(velocity.current, dt);
-    camera.position.y = eyeHeight;
-  });
-  return touch ? null : (
-    <PointerLockControls selector=".viewport canvas" pointerSpeed={0.65} />
-  );
-}
 function DropFurniture() {
   const { gl, camera } = useThree();
   const { change, select } = useStore();
@@ -681,6 +556,7 @@ export default function Scene({
   eyeHeight = 1.55,
   fieldOfView = 72,
   walkSpeed = 1.4,
+  freeWalk = false,
   realistic = false,
   paused = false,
   showCollisions = true,
@@ -695,6 +571,7 @@ export default function Scene({
   eyeHeight?: number;
   fieldOfView?: number;
   walkSpeed?: number;
+  freeWalk?: boolean;
   walk: boolean;
   transparent: boolean;
   ceiling: boolean;
@@ -1118,6 +995,8 @@ export default function Scene({
               eyeHeight={eyeHeight}
               fieldOfView={fieldOfView}
               speed={walkSpeed}
+              free={freeWalk}
+              hide={hide}
             />
           ) : (
             <OrbitControls
