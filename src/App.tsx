@@ -1215,6 +1215,37 @@ export default function App() {
               </button>
             </div>
           </div>
+          {p.analysis && view !== "walk" && (
+            <div className="analysis-banner">
+              <span>
+                <strong>Appartement généré automatiquement</strong> ·{" "}
+                {p.rooms.length} pièces · {p.analysis.surface} m² renseignés
+              </span>
+              <small>
+                Dimensions estimées ·{" "}
+                {
+                  p.walls
+                    .flatMap((w) => w.openings)
+                    .filter((o) => o.detection && !o.detection.reviewed).length
+                }{" "}
+                ouvertures à vérifier
+              </small>
+              <button
+                onClick={() => {
+                  setView("2d");
+                  setTab("build");
+                  const w = p.walls.find((w) =>
+                    w.openings.some(
+                      (o) => o.detection && !o.detection.reviewed,
+                    ),
+                  );
+                  if (w) select(w.id);
+                }}
+              >
+                Vérifier les ouvertures
+              </button>
+            </div>
+          )}
           <div className="viewport">
             <nav className="drawing-toolbar" aria-label="Outils du plan">
               {(
@@ -1244,38 +1275,6 @@ export default function App() {
                 </button>
               ))}
             </nav>
-            {p.analysis && view === "2d" && (
-              <div className="analysis-banner">
-                <span>
-                  <strong>Appartement généré automatiquement</strong> ·{" "}
-                  {p.rooms.length} pièces · {p.analysis.surface} m² renseignés
-                </span>
-                <small>
-                  Dimensions estimées ·{" "}
-                  {
-                    p.walls
-                      .flatMap((w) => w.openings)
-                      .filter((o) => o.detection && !o.detection.reviewed)
-                      .length
-                  }{" "}
-                  ouvertures à vérifier
-                </small>
-                <button
-                  onClick={() => {
-                    setView("2d");
-                    setTab("build");
-                    const w = p.walls.find((w) =>
-                      w.openings.some(
-                        (o) => o.detection && !o.detection.reviewed,
-                      ),
-                    );
-                    if (w) select(w.id);
-                  }}
-                >
-                  Vérifier les ouvertures
-                </button>
-              </div>
-            )}
             {view === "2d" ? (
               <Plan
                 tool={tool}
