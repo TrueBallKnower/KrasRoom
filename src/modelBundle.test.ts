@@ -16,6 +16,11 @@ const files = {
   "chair/textures/fabric blue.png": new Uint8Array([4, 5, 6]),
 };
 describe("Meubles ZIP portables", () => {
+  it("explique comment convertir un fichier Blender natif", async () => {
+    await expect(
+      prepareFurnitureFile(new File(["BLENDER"], "scene.blend")),
+    ).rejects.toThrow("glTF Binary (.glb)");
+  });
   it("intègre les octets du modèle et des textures sans ressource externe", async () => {
     const result = JSON.parse(
       await embedGLTF(files, "chair/scene.gltf").text(),

@@ -63,6 +63,10 @@ export function embedGLTF(
 export async function prepareFurnitureFile(
   file: File,
 ): Promise<{ blob: Blob; name: string }> {
+  if (/\.blend$/i.test(file.name))
+    throw Error(
+      "Un fichier .blend nécessite Blender. Dans Blender : File → Export → glTF 2.0 → glTF Binary (.glb), puis importez ce GLB avec ses textures.",
+    );
   checkSize(file.size, MODEL_FILE_LIMIT, "Fichier");
   if (!/\.zip$/i.test(file.name)) return { blob: file, name: file.name };
   let expanded = 0;

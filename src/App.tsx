@@ -88,7 +88,7 @@ import StorageStatus from "./StorageStatus";
 import DimensionsEditor from "./DimensionsEditor";
 import { edgeWallDistance } from "./placement";
 const AccountPanel = lazy(() => import("./AccountPanel"));
-const SplitModel = lazy(() => import("./SplitModel"));
+const ModelWorkshop = lazy(() => import("./ModelWorkshop"));
 import CameraToolbar from "./CameraToolbar";
 import AssetImage from "./AssetImage";
 import { visitStart } from "./spatial";
@@ -335,6 +335,10 @@ export default function App() {
         )
       )
         return;
+      if (modal) {
+        if (e.key === "Escape") setModal(null);
+        return;
+      }
       if (
         e.key.toLowerCase() === "e" &&
         !e.ctrlKey &&
@@ -409,6 +413,18 @@ export default function App() {
         "Meuble et textures enregistrés dans Mes meubles. Vérifiez ses dimensions en mètres.",
       );
     });
+  }
+  async function storeWorkshopModel(file: File, place: boolean) {
+    const i = await importFurnitureFile(file);
+    await libraryPut(i);
+    setPersonal(await library());
+    if (place) {
+      add(i);
+      setView("3d");
+      setRealistic(true);
+      setModal(null);
+      notify("Modèle ajouté à l’appartement et enregistré dans Mes meubles.");
+    } else notify("Copie nettoyée enregistrée dans Mes meubles.");
   }
   function add(i: Item) {
     const id = uid();
@@ -798,6 +814,12 @@ export default function App() {
                   Sélectionnez un meuble puis « Garder dans Mes meubles ».
                 </p>
               )}
+              <button
+                className="outline full"
+                onClick={() => setModal("split")}
+              >
+                Atelier 3D · créer et importer
+              </button>
               <button
                 className="outline full import-button"
                 onClick={() => setModal("import")}
@@ -1938,7 +1960,7 @@ export default function App() {
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <section
-            className="modal"
+            className={modal === "split" ? "modal workshop-modal" : "modal"}
             role="dialog"
             aria-modal="true"
             aria-label="Gestion KrasRoom"
@@ -2073,11 +2095,14 @@ export default function App() {
                   Créer un appartement de démonstration
                 </button>
               </>
-            ) : modal === "split" && item ? (
+            ) : modal === "split" ? (
               <Suspense fallback={<p>Chargement de la structure…</p>}>
-                <SplitModel
+                <ModelWorkshop
                   item={item}
+                  onCreate={(file) => storeWorkshopModel(file, true)}
+                  onSaveLibrary={(file) => storeWorkshopModel(file, false)}
                   onSplit={(items) => {
+                    if (!item) return;
                     change((p) => {
                       p.items = p.items.filter((i) => i.id !== item.id);
                       p.items.push(...items);
@@ -2098,6 +2123,12 @@ export default function App() {
                   Importez un vrai modèle ou créez une référence à ses
                   dimensions.
                 </p>
+                <button
+                  className="outline full"
+                  onClick={() => setModal("split")}
+                >
+                  Ouvrir l’Atelier 3D · créer ou importer depuis Blender
+                </button>
                 <FurnitureSources />
                 <button
                   className="import-option furniture-file-drop"

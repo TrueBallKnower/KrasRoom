@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Box3, Vector3, type Object3D } from "three";
+import { Box3, Vector3, Group, type Object3D } from "three";
 import {
   acquireModel,
   modelNode,
@@ -10,16 +10,22 @@ import { Canvas } from "@react-three/fiber";
 import { Bounds, OrbitControls } from "@react-three/drei";
 import { normalizedClone } from "./modelAssets";
 import { uid, type Item } from "./model";
+import { exportModelGLB, downloadModel } from "./modelExport";
 export default function SplitModel({
   item,
   onSplit,
+  onSaveLibrary,
 }: {
   item: Item;
   onSplit: (items: Item[]) => void;
+  onSaveLibrary: (file: File) => Promise<void>;
 }) {
   const [scene, setScene] = useState<Object3D>();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string>();
+  const [search, setSearch] = useState(""),
+    [isolated, setIsolated] = useState(false),
+    [working, setWorking] = useState(false);
   const [parts, setParts] = useState<ModelPart[]>([]),
     [origin, setOrigin] = useState<{
       x: number;
@@ -90,9 +96,42 @@ export default function SplitModel({
         }),
     );
   }
+  async function exportCleaned(save: boolean) {
+    if (!scene || !origin) return;
+    setWorking(true);
+    setError("");
+    try {
+      const group = new Group();
+      group.name = item.name + " nettoyé";
+      for (const p of parts.filter((p) => !hidden.has(p.path))) {
+        const clone = normalizedClone(scene, p.path).group;
+        clone.position.set(0, 0, 0);
+        clone.name = p.name;
+        group.add(clone);
+      }
+      group.scale.set(
+        item.width / origin.width,
+        item.height / origin.height,
+        item.depth / origin.depth,
+      );
+      const bounds = new Box3().setFromObject(group),
+        center = bounds.getCenter(new Vector3());
+      group.position.set(-center.x, -bounds.min.y, -center.z);
+      const blob = await exportModelGLB(group);
+      if (save)
+        await onSaveLibrary(
+          new File([blob], group.name + ".glb", { type: "model/gltf-binary" }),
+        );
+      else downloadModel(blob, group.name);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWorking(false);
+    }
+  }
   return (
     <>
-      <h2>Atelier 3D</h2>
+      <h3>Retirer le décor</h3>
       <p className="small">
         Cliquez sur un élément dans l’aperçu pour le repérer. Décochez le mur,
         le sol ou les accessoires à retirer, puis appliquez. Vous pouvez tourner
@@ -116,80 +155,151 @@ export default function SplitModel({
         <WorkshopPreview
           scene={scene}
           parts={parts}
-          hidden={hidden}
+          hidden={
+            isolated && selected
+              ? new Set(
+                  parts
+                    .filter((p) => p.path !== selected || hidden.has(p.path))
+                    .map((p) => p.path),
+                )
+              : hidden
+          }
           selected={selected}
           onSelect={setSelected}
         />
       )}
       {parts.length > 0 && (
         <div className="workshop-actions">
-          <button onClick={() => setHidden(new Set())}>Tout afficher</button>
+          <button
+            onClick={() => {
+              setHidden(new Set());
+              setIsolated(false);
+            }}
+          >
+            Tout afficher
+          </button>
+          <button
+            disabled={!selected}
+            aria-pressed={isolated}
+            onClick={() => setIsolated((v) => !v)}
+          >
+            Isoler la sélection
+          </button>
+          <button
+            disabled={!selected}
+            onClick={() => {
+              if (selected) setHidden((old) => new Set([...old, selected]));
+            }}
+          >
+            Retirer la sélection
+          </button>
           <span className="small">
             {parts.length - hidden.size} / {parts.length} éléments conservés
           </span>
         </div>
       )}
+      {parts.length > 0 && (
+        <label className="field">
+          Rechercher un élément
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Sol, mur, canapé…"
+          />
+        </label>
+      )}
       <div className="model-parts">
-        {parts.map((p) => (
-          <div
-            key={p.path}
-            className={selected === p.path ? "workshop-selected" : ""}
-          >
-            <label>
-              <input
-                type="checkbox"
-                checked={!hidden.has(p.path)}
-                onChange={() => {
-                  setSelected(p.path);
-                  setHidden((old) => {
-                    const next = new Set(old);
-                    if (next.has(p.path)) next.delete(p.path);
-                    else next.add(p.path);
-                    return next;
-                  });
-                }}
-              />{" "}
-              Garder <strong>{p.name}</strong>
-            </label>
-            <small>
-              {origin ? ((p.width * item.width) / origin.width).toFixed(2) : ""}{" "}
-              ×{" "}
-              {origin ? ((p.depth * item.depth) / origin.depth).toFixed(2) : ""}{" "}
-              m
-            </small>
-            <button onClick={() => setSelected(p.path)}>Repérer</button>
-            {scene && separableParts(scene, p.path).length > 1 && (
-              <button
-                onClick={() => {
-                  const children = separableParts(scene, p.path);
-                  setParts((old) =>
-                    old.flatMap((v) => (v.path === p.path ? children : [v])),
-                  );
-                  setHidden((old) => {
-                    const next = new Set(old);
-                    const wasHidden = next.delete(p.path);
-                    if (wasHidden) children.forEach((c) => next.add(c.path));
-                    return next;
-                  });
-                  setSelected(undefined);
-                }}
-              >
-                Ouvrir le groupe {p.name}
-              </button>
-            )}
-          </div>
-        ))}
+        {parts
+          .filter((p) =>
+            p.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
+          )
+          .map((p) => (
+            <div
+              key={p.path}
+              className={selected === p.path ? "workshop-selected" : ""}
+            >
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!hidden.has(p.path)}
+                  onChange={() => {
+                    setSelected(p.path);
+                    setHidden((old) => {
+                      const next = new Set(old);
+                      if (next.has(p.path)) next.delete(p.path);
+                      else next.add(p.path);
+                      return next;
+                    });
+                  }}
+                />{" "}
+                Garder <strong>{p.name}</strong>
+              </label>
+              <small>
+                {origin
+                  ? ((p.width * item.width) / origin.width).toFixed(2)
+                  : ""}{" "}
+                ×{" "}
+                {origin
+                  ? ((p.depth * item.depth) / origin.depth).toFixed(2)
+                  : ""}{" "}
+                m
+              </small>
+              <button onClick={() => setSelected(p.path)}>Repérer</button>
+              {scene && separableParts(scene, p.path).length > 1 && (
+                <button
+                  onClick={() => {
+                    const children = separableParts(scene, p.path);
+                    if (parts.length - 1 + children.length > 128) {
+                      setError(
+                        "Limite de 128 éléments pour conserver un aperçu fluide. Séparez le modèle dans Blender.",
+                      );
+                      return;
+                    }
+                    setParts((old) =>
+                      old.flatMap((v) => (v.path === p.path ? children : [v])),
+                    );
+                    setHidden((old) => {
+                      const next = new Set(old);
+                      const wasHidden = next.delete(p.path);
+                      if (wasHidden) children.forEach((c) => next.add(c.path));
+                      return next;
+                    });
+                    setSelected(undefined);
+                  }}
+                >
+                  Ouvrir le groupe {p.name}
+                </button>
+              )}
+            </div>
+          ))}
       </div>
       {parts.length > 1 && (
         <button
           className="primary full"
-          disabled={hidden.size === parts.length}
+          disabled={working || hidden.size === parts.length}
           onClick={split}
         >
           {hidden.size
             ? `Appliquer · garder ${parts.length - hidden.size} éléments`
             : `Dissocier ces ${parts.length} sous-objets`}
         </button>
+      )}
+      {parts.length > 0 && (
+        <div className="workshop-actions">
+          <button
+            disabled={working || hidden.size === parts.length}
+            onClick={() => void exportCleaned(false)}
+          >
+            Télécharger le modèle nettoyé en GLB
+          </button>
+          <button
+            disabled={working || hidden.size === parts.length}
+            onClick={() => void exportCleaned(true)}
+          >
+            Garder une copie nettoyée dans Mes meubles
+          </button>
+          {working && <span role="status">Export des éléments conservés…</span>}
+        </div>
       )}
       {parts.length > 0 && (
         <p className="small">
@@ -232,6 +342,7 @@ function WorkshopPreview({
     >
       <Canvas
         frameloop="demand"
+        dpr={[1, 1.5]}
         camera={{ position: [5, 4, 6], near: 0.01, far: 100000 }}
       >
         <color attach="background" args={["#cbd5df"]} />

@@ -2717,3 +2717,100 @@ button:focus-visible {
   height: 18px;
   flex-shrink: 0;
 }
+.workshop-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0;
+}
+.workshop-tabs button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+}
+.workshop-tabs button[aria-pressed="true"] {
+  background: var(--green);
+  color: white;
+}
+.model-creator fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.model-creator fieldset > .full {
+  margin-top: 10px;
+}
+.creator-preview {
+  height: 300px;
+}
+.creator-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.creator-fields input,
+.model-creator select,
+.model-creator input {
+  width: 100%;
+  min-width: 0;
+}
+.blender-steps {
+  padding-left: 24px;
+  line-height: 1.6;
+}
+.blender-steps li {
+  margin-bottom: 10px;
+}
+@media (max-width: 600px) {
+  .creator-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .creator-preview {
+    height: 240px;
+  }
+  .workshop-tabs button {
+    flex: 1;
+    font-size: 12px;
+  }
+}
+.workshop-modal .workshop-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.workshop-modal .workshop-actions button {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.workshop-modal {
+  width: 900px;
+}
+.creator-visual,
+.creator-editor {
+  min-width: 0;
+}
+.creator-editor > .full {
+  margin-top: 10px;
+}
+@media (min-width: 760px) {
+  .creator-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  .creator-visual {
+    position: sticky;
+    top: 0;
+  }
+  .creator-preview {
+    height: min(300px, 45dvh);
+  }
+  .creator-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

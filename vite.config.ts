@@ -18,5 +18,9 @@ export default defineConfig(({ mode }) => {
     throw Error(
       "La configuration Supabase doit contenir l’URL et sa clé publique, ou rester entièrement vide.",
     );
-  return { plugins: [react()], base: "./" };
+  return {
+    plugins: [react()],
+    base: "./",
+    optimizeDeps: { include: ["three/examples/jsm/exporters/GLTFExporter.js"] },
+  };
 });

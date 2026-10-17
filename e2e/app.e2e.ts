@@ -970,6 +970,43 @@ test("proportions, unités et dissociation d’un ensemble restent sauvegardable
   await page
     .getByRole("checkbox", { name: "Garder Fauteuil séparé", exact: true })
     .uncheck();
+  const cleanedDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", {
+      name: "Télécharger le modèle nettoyé en GLB",
+      exact: true,
+    })
+    .click();
+  const cleanedStream = await (await cleanedDownload).createReadStream(),
+    cleanedChunks: Buffer[] = [];
+  for await (const chunk of cleanedStream!) cleanedChunks.push(chunk);
+  const cleaned = Buffer.concat(cleanedChunks);
+  expect(cleaned.toString("ascii", 0, 4)).toBe("glTF");
+  const cleanedJSON = JSON.parse(
+    cleaned.toString("utf8", 20, 20 + cleaned.readUInt32LE(12)).trim(),
+  );
+  expect(
+    cleanedJSON.nodes.some(
+      (n: { name?: string }) => n.name === "Fauteuil séparé",
+    ),
+  ).toBe(false);
+  expect(
+    cleanedJSON.nodes.some(
+      (n: { name?: string }) => n.name === "Lampe séparée",
+    ),
+  ).toBe(true);
+
+  await page
+    .getByRole("button", {
+      name: "Garder une copie nettoyée dans Mes meubles",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText("Copie nettoyée enregistrée dans Mes meubles.", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Appliquer · garder 1 éléments", exact: true })
     .click();
