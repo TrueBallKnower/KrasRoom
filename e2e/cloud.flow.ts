@@ -108,7 +108,16 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
     await expect
       .poll(() => reads.get(a) || 0)
       .toBeGreaterThan(readsBeforeReload);
-    await expect(pa.locator(".account-button")).not.toContainText("Synchro");
+    // A revision request may have started before session restoration finishes.
+    // Wait for the actual transfer lock to be released before taking A offline.
+    await pa.getByRole("button", { name: /Mon compte/ }).click();
+    await expect(
+      pa.getByRole("button", {
+        name: "Sauvegarder cet appartement en ligne",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await pa.getByRole("button", { name: "Fermer", exact: true }).click();
     // A works offline while B edits: create a genuine concurrent change.
     blocked.add(a);
     await a.setOffline(true);
@@ -147,14 +156,15 @@ test("deux navigateurs retrouvent les meubles et les modifications, sans écrase
         "Une autre version existe en ligne",
       );
     } catch (error) {
-      console.log(
-        "Cloud conflict diagnostics",
-        JSON.stringify({
-          writes,
-          modal: await pa.getByRole("dialog").innerText(),
-        }),
+      throw Error(
+        "Cloud conflict diagnostics: " +
+          JSON.stringify({
+            writes,
+            modal: await pa.getByRole("dialog").innerText(),
+          }) +
+          "\n" +
+          String(error),
       );
-      throw error;
     }
     await login(pc, "other@example.com");
     await expect(
