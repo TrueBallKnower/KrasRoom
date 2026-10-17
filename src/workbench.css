@@ -112,8 +112,8 @@
     align-items: stretch;
     gap: 7px;
     padding: 14px 5px;
-    background: #243b3b;
-    color: #d6e3df;
+    background: #151d38;
+    color: #dfe5ff;
     border-radius: 0 12px 12px 0;
   }
   .workspace-rail > button {
@@ -121,7 +121,7 @@
     gap: 6px;
     padding: 12px 2px;
     border-radius: 7px;
-    color: #b6c9c4;
+    color: #a7b5dd;
   }
   .workspace-rail > button > span {
     font-size: 8px;
@@ -152,13 +152,13 @@
     font-family: Georgia, serif;
     font-style: italic;
     font-size: 25px;
-    color: #d8c5a5;
+    color: #bbc7ff;
   }
   .rail-bottom > span:last-child {
     font-size: 7px;
     writing-mode: vertical-rl;
     letter-spacing: 1.4px;
-    color: #9db6ad;
+    color: #94a4cf;
   }
   .app .workspace > .left,
   .app .workspace > .right {
@@ -237,7 +237,7 @@
     height: 133px;
     border: 1px solid transparent;
     border-radius: 8px;
-    background: #efeee8;
+    background: #edf0f8;
   }
   .app .furniture-preview > svg {
     width: 92%;
@@ -311,7 +311,7 @@
   .app .project-summary {
     margin-top: 22px;
     padding: 20px 16px;
-    background: #eeede6;
+    background: #edf0f8;
   }
   .app .project-summary > div {
     padding-top: 12px;
@@ -428,7 +428,7 @@
   background: var(--soft);
 }
 [data-theme="dark"] .app .view-switch .active {
-  background: #39777a;
+  background: #4c59e8;
 }
 .app.immersive-visit .workspace-rail {
   display: none !important;

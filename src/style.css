@@ -2718,16 +2718,16 @@ button:focus-visible {
   flex-shrink: 0;
 }
 
-/* KrasRoom: warm paper, graphite and a single petroleum-blue accent. */
+/* KrasRoom: cool neutrals and an electric indigo accent. */
 :root {
-  --bg: #fdfcf9;
-  --soft: #f1f0eb;
-  --line: #e3e2dc;
-  --ink: #283433;
-  --muted: #727b76;
-  --green: #32686c;
-  --tint: #e6efed;
-  --workspace: #e9eae4;
+  --bg: #fbfcff;
+  --soft: #f0f2f8;
+  --line: #e1e5ef;
+  --ink: #283047;
+  --muted: #717c95;
+  --green: #4c59e8;
+  --tint: #ecf0ff;
+  --workspace: #edf0f7;
   color: var(--ink);
   background: var(--soft);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -2820,7 +2820,7 @@ select:focus {
   background: var(--green);
 }
 .primary:hover {
-  background: #275559;
+  background: #3b46c7;
 }
 .app .workspace > aside {
   background: var(--bg);
@@ -2856,7 +2856,7 @@ select:focus {
 }
 .app .tabs button.active {
   background: var(--bg);
-  box-shadow: 0 1px 3px #28343312;
+  box-shadow: 0 1px 3px #28304712;
   color: var(--green);
 }
 .app .search {
@@ -2898,7 +2898,7 @@ select:focus {
 }
 .app .furniture-card:hover {
   border-color: var(--green);
-  box-shadow: 0 4px 12px #2834330a;
+  box-shadow: 0 4px 12px #2830470a;
 }
 .app .furniture-preview {
   height: 106px;
@@ -2941,7 +2941,7 @@ select:focus {
 .app .visit-settings {
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 3px 12px #28343308;
+  box-shadow: 0 3px 12px #28304708;
   background: var(--bg);
 }
 .app .view-switch button {
@@ -3092,21 +3092,21 @@ select:focus {
   }
 }
 [data-theme="dark"] {
-  --bg: #202827;
-  --soft: #293230;
-  --line: #3a4440;
-  --ink: #e8eae3;
-  --muted: #a3afa7;
-  --green: #8abfbc;
-  --tint: #304946;
-  --workspace: #18201f;
+  --bg: #171c2c;
+  --soft: #20263a;
+  --line: #333c54;
+  --ink: #e8ecfa;
+  --muted: #a5afc7;
+  --green: #9aa8ff;
+  --tint: #293454;
+  --workspace: #111626;
   color: var(--ink);
 }
 [data-theme="dark"] .primary {
-  background: #39777a;
+  background: #4c59e8;
 }
 [data-theme="dark"] .primary:hover {
-  background: #43878a;
+  background: #626ff5;
 }
 @media (prefers-reduced-motion: reduce) {
   *,
