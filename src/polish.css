@@ -503,3 +503,218 @@ summary:focus-visible {
     display: none;
   }
 }
+
+/* Scene controls share one bounded flow: no independent floating panels. */
+.app .viewport-toolbar {
+  position: relative;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  pointer-events: auto;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.app .viewport-actions {
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.app .viewport-actions .mobile-display-toggle {
+  position: static;
+  display: flex;
+  min-height: 32px;
+  font-size: 11px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+}
+.app .mobile-display-toggle[aria-expanded="true"] {
+  background: var(--tint);
+  color: var(--green);
+}
+.app .workspace:not([data-view="2d"]) .drawing-toolbar {
+  display: none;
+}
+.app .scene-settings-dock {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  bottom: 120px;
+  width: min(270px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  border-radius: 10px;
+  pointer-events: auto;
+}
+.app .scene-settings-dock[hidden] {
+  display: none !important;
+}
+.app .scene-settings-dock > * {
+  flex: 0 0 auto;
+}
+.app .scene-settings-dock .camera-toolbar,
+.app .workspace .scene-settings-dock .visit-settings,
+.app .workspace .scene-settings-dock .render-controls {
+  position: static;
+  display: block;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+}
+.app .scene-settings-dock .camera-toolbar-content {
+  max-height: none;
+  overflow: visible;
+}
+.app .workspace .scene-settings-dock .visit-settings {
+  display: grid;
+  padding: 14px;
+  gap: 14px;
+  font-size: 11px;
+}
+.app .visit-settings label {
+  flex-wrap: wrap;
+}
+.app .scene-settings-dock .visit-settings input[type="range"] {
+  flex: 1;
+  min-width: 60px;
+  max-width: 100px;
+}
+.app .workspace[data-view="walk"] .scene-settings-dock {
+  bottom: 65px;
+}
+.app .scene-object-actions {
+  left: 12px;
+  right: 12px;
+  bottom: 36px;
+  transform: none;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  max-height: 80px;
+  overflow: auto;
+  justify-content: flex-start;
+}
+.app .scene-object-actions strong {
+  width: auto;
+  max-width: 140px;
+  border: 0;
+  padding: 0 6px;
+}
+.app .scene-object-actions small {
+  display: none;
+}
+.app .canvas-hint {
+  left: 0;
+  bottom: 0;
+  transform: none;
+  width: 100%;
+  max-width: none;
+  padding: 6px 12px;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 9px;
+}
+.app.immersive-visit .scene-settings-dock {
+  display: none !important;
+}
+@media (max-width: 1100px), (pointer: coarse) and (max-width: 1400px) {
+  .app .viewport-actions .mobile-display-toggle {
+    min-height: 40px;
+  }
+  .app .scene-settings-dock,
+  .app .workspace[data-view="walk"] .scene-settings-dock {
+    bottom: 160px;
+  }
+  .app .scene-settings-dock .camera-toolbar-toggle,
+  .app .scene-settings-dock select,
+  .app .scene-settings-dock button {
+    min-height: 40px;
+  }
+  .app .scene-settings-dock .visit-settings label {
+    min-height: 36px;
+  }
+  .app .scene-object-actions {
+    bottom: 12px;
+  }
+}
+@media (max-width: 600px) {
+  .app .viewport-toolbar {
+    padding: 6px 8px;
+  }
+}
+@media (max-height: 520px) and (max-width: 1100px) {
+  .app .viewport-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
+  .app .view-switch {
+    width: auto;
+  }
+  .app .scene-settings-dock,
+  .app .workspace[data-view="walk"] .scene-settings-dock {
+    bottom: 90px;
+  }
+}
+/* Plan tools are anchored to the canvas, below the wrapping view toolbar. */
+.app .viewport > .drawing-toolbar {
+  top: 12px;
+  left: 12px;
+  max-height: calc(100% - 100px);
+  overflow: auto;
+}
+.app .viewport > .analysis-banner {
+  top: 12px;
+  left: 72px;
+  right: 12px;
+  width: auto;
+  max-height: 100px;
+  overflow: auto;
+}
+@media (max-width: 600px) {
+  .app .viewport > .drawing-toolbar {
+    top: auto;
+    bottom: 70px;
+    left: 8px;
+    right: 8px;
+  }
+  .app .viewport > .analysis-banner {
+    left: 8px;
+  }
+}
+@media (max-height: 520px) and (max-width: 1100px) {
+  .app .viewport > .drawing-toolbar {
+    top: 8px;
+    bottom: auto;
+  }
+  .app .viewport > .analysis-banner {
+    top: 68px;
+  }
+}
+@media (max-width: 1100px), (pointer: coarse) and (max-width: 1400px) {
+  .app
+    .workspace[data-view="walk"][data-settings-open="true"]
+    .scene-settings-dock {
+    bottom: 12px;
+  }
+}
+@media (max-height: 520px) and (max-width: 1100px) {
+  .app .touch-stick {
+    width: 120px;
+    height: 120px;
+  }
+  .app .touch-stick button:nth-of-type(1),
+  .app .touch-stick button:nth-of-type(3) {
+    left: 38px;
+  }
+  .app .touch-stick button:nth-of-type(2),
+  .app .touch-stick button:nth-of-type(4) {
+    top: 38px;
+  }
+}

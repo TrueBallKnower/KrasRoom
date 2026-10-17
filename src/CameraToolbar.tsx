@@ -14,7 +14,7 @@ export default function CameraToolbar() {
   useEffect(() => {
     const editing = (e: KeyboardEvent) =>
       (e.target as HTMLElement)?.closest?.(
-        "input,textarea,select,summary,.camera-toolbar-toggle,[contenteditable],[role=dialog]",
+        "input,textarea,select,summary,.camera-toolbar-toggle,.mobile-display-toggle,[contenteditable],[role=dialog]",
       );
     const down = (e: KeyboardEvent) => {
       if (

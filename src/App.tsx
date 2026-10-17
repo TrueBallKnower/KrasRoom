@@ -179,6 +179,9 @@ export default function App() {
     localStorage.getItem("krasroom-experience") === "pro" ? "pro" : "simple",
   );
   useEffect(() => {
+    setMobileSettings(view === "3d" && !compact);
+  }, [view, compact]);
+  useEffect(() => {
     localStorage.setItem("krasroom-experience", experience);
   }, [experience]);
   function setLighting(value: LightingProfile) {
@@ -1143,6 +1146,16 @@ export default function App() {
               </button>
             </div>
             <div className="viewport-actions">
+              {view !== "2d" && (
+                <button
+                  className="mobile-display-toggle"
+                  aria-expanded={mobileSettings}
+                  aria-controls="scene-settings"
+                  onClick={() => setMobileSettings((v) => !v)}
+                >
+                  Affichage
+                </button>
+              )}
               <button
                 title={
                   lighting === "night"
@@ -1202,74 +1215,66 @@ export default function App() {
               </button>
             </div>
           </div>
-          <nav className="drawing-toolbar" aria-label="Outils du plan">
-            {(
-              [
-                ["select", "Sélectionner", MousePointer2],
-                ["wall", "Tracer des murs", Wallpaper],
-                ["room", "Définir une pièce", Grid2X2],
-                ["door", "Ajouter une porte", DoorOpen],
-                ["window", "Ajouter une fenêtre", Layers],
-                ["measure", "Mesurer une distance", Ruler],
-              ] as const
-            ).map(([key, label, Icon]) => (
-              <button
-                key={key}
-                title={label}
-                aria-label={label + " — outil rapide"}
-                aria-pressed={view === "2d" && tool === key}
-                className={view === "2d" && tool === key ? "active" : ""}
-                onClick={() => {
-                  setView("2d");
-                  setTool(key);
-                  setMobilePanel(null);
-                  if (key !== "select") setTab("build");
-                }}
-              >
-                <Icon size={19} />
-              </button>
-            ))}
-          </nav>
-          {p.analysis && (
-            <div className="analysis-banner">
-              <span>
-                <strong>Appartement généré automatiquement</strong> ·{" "}
-                {p.rooms.length} pièces · {p.analysis.surface} m² renseignés
-              </span>
-              <small>
-                Dimensions estimées ·{" "}
-                {
-                  p.walls
-                    .flatMap((w) => w.openings)
-                    .filter((o) => o.detection && !o.detection.reviewed).length
-                }{" "}
-                ouvertures à vérifier
-              </small>
-              <button
-                onClick={() => {
-                  setView("2d");
-                  setTab("build");
-                  const w = p.walls.find((w) =>
-                    w.openings.some(
-                      (o) => o.detection && !o.detection.reviewed,
-                    ),
-                  );
-                  if (w) select(w.id);
-                }}
-              >
-                Vérifier les ouvertures
-              </button>
-            </div>
-          )}
           <div className="viewport">
-            {view !== "2d" && (
-              <button
-                className="mobile-display-toggle"
-                aria-expanded={mobileSettings}
-                onClick={() => setMobileSettings((v) => !v)}
-              >
-                Affichage
-              </button>
+            <nav className="drawing-toolbar" aria-label="Outils du plan">
+              {(
+                [
+                  ["select", "Sélectionner", MousePointer2],
+                  ["wall", "Tracer des murs", Wallpaper],
+                  ["room", "Définir une pièce", Grid2X2],
+                  ["door", "Ajouter une porte", DoorOpen],
+                  ["window", "Ajouter une fenêtre", Layers],
+                  ["measure", "Mesurer une distance", Ruler],
+                ] as const
+              ).map(([key, label, Icon]) => (
+                <button
+                  key={key}
+                  title={label}
+                  aria-label={label + " — outil rapide"}
+                  aria-pressed={view === "2d" && tool === key}
+                  className={view === "2d" && tool === key ? "active" : ""}
+                  onClick={() => {
+                    setView("2d");
+                    setTool(key);
+                    setMobilePanel(null);
+                    if (key !== "select") setTab("build");
+                  }}
+                >
+                  <Icon size={19} />
+                </button>
+              ))}
+            </nav>
+            {p.analysis && view === "2d" && (
+              <div className="analysis-banner">
+                <span>
+                  <strong>Appartement généré automatiquement</strong> ·{" "}
+                  {p.rooms.length} pièces · {p.analysis.surface} m² renseignés
+                </span>
+                <small>
+                  Dimensions estimées ·{" "}
+                  {
+                    p.walls
+                      .flatMap((w) => w.openings)
+                      .filter((o) => o.detection && !o.detection.reviewed)
+                      .length
+                  }{" "}
+                  ouvertures à vérifier
+                </small>
+                <button
+                  onClick={() => {
+                    setView("2d");
+                    setTab("build");
+                    const w = p.walls.find((w) =>
+                      w.openings.some(
+                        (o) => o.detection && !o.detection.reviewed,
+                      ),
+                    );
+                    if (w) select(w.id);
+                  }}
+                >
+                  Vérifier les ouvertures
+                </button>
+              </div>
             )}
             {view === "2d" ? (
               <Plan
@@ -1307,7 +1312,6 @@ export default function App() {
                     onError={notify}
                   />
                 </Suspense>
-                {view === "3d" && <CameraToolbar />}
                 {view === "3d" && item && (
                   <div
                     className="scene-object-actions"
@@ -1372,176 +1376,196 @@ export default function App() {
                 {view === "walk" && (
                   <div className="visit-reticle" aria-hidden="true" />
                 )}
-                {view === "walk" && touch && <TouchVisit />}
-                {view === "walk" && (
-                  <div className="visit-settings">
-                    <strong>Confort de visite</strong>
-                    <button
-                      className="outline"
-                      onClick={toggleImmersive}
-                      title="Masquer l’interface et visiter en plein écran · L"
-                    >
-                      Visite sans interface · L
-                    </button>
-                    <label>
-                      Hauteur des yeux{" "}
-                      <select
-                        aria-label="Hauteur des yeux"
-                        value={eyeHeight}
-                        onChange={(e) => setEyeHeight(Number(e.target.value))}
-                      >
-                        <option value={1.4}>1,40 m</option>
-                        <option value={1.55}>1,55 m</option>
-                        <option value={1.65}>1,65 m</option>
-                        <option value={1.75}>1,75 m</option>
-                      </select>
-                    </label>
-                    <label>
-                      Champ de vision{" "}
-                      <input
-                        aria-label="Champ de vision"
-                        type="range"
-                        min="55"
-                        max="90"
-                        value={fieldOfView}
-                        onChange={(e) => setFieldOfView(Number(e.target.value))}
-                      />
-                      <span>{fieldOfView}°</span>
-                    </label>
-                    <label>
-                      Déplacement{" "}
-                      <select
-                        aria-label="Vitesse de visite"
-                        value={walkSpeed}
-                        onChange={(e) => setWalkSpeed(Number(e.target.value))}
-                      >
-                        <option value={0.8}>Lent</option>
-                        <option value={1.4}>Normal</option>
-                        <option value={2.2}>Rapide</option>
-                      </select>
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={freeWalk}
-                        onChange={(e) => setFreeWalk(e.target.checked)}
-                      />
-                      Traverser les obstacles
-                    </label>
-                    <button
-                      className="outline"
-                      onClick={() => useTouchWalk.getState().restart()}
-                    >
-                      Revenir au départ
-                    </button>
-                    <small>
-                      La perspective change, les dimensions restent en mètres.
-                      Échap pour régler la visite.
-                    </small>
-                  </div>
+                {view === "walk" && touch && (!mobileSettings || immersive) && (
+                  <TouchVisit />
                 )}
-                <details className="render-controls" open>
-                  <summary>
-                    <Sun size={15} />
-                    Rendu et ambiance
-                    <ChevronDown size={14} />
-                  </summary>
-                  <div className="render-controls-body">
-                    <label>
-                      Rendu{" "}
-                      <select
-                        aria-label="Style de rendu"
-                        value={realistic ? "realistic" : "standard"}
-                        onChange={(e) =>
-                          setRealistic(e.target.value === "realistic")
-                        }
+                <div
+                  id="scene-settings"
+                  className="scene-settings-dock"
+                  aria-label="Réglages de la vue"
+                  hidden={!mobileSettings}
+                >
+                  {view === "3d" && <CameraToolbar />}
+                  {view === "walk" && (
+                    <div className="visit-settings">
+                      <strong>Confort de visite</strong>
+                      <button
+                        className="outline"
+                        onClick={toggleImmersive}
+                        title="Masquer l’interface et visiter en plein écran · L"
                       >
-                        <option value="standard">Standard · fluide</option>
-                        <option value="realistic">
-                          Réaliste · matières et lumière
-                        </option>
-                      </select>
-                    </label>
-                    {
-                      <>
-                        <label>
-                          Lumière{" "}
-                          <select
-                            aria-label="Ambiance lumineuse"
-                            value={lighting}
-                            onChange={(e) =>
-                              setLighting(e.target.value as LightingProfile)
-                            }
-                          >
-                            {Object.entries(lightingProfiles).map(([id, p]) => (
-                              <option key={id} value={id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          Exposition{" "}
-                          <input
-                            aria-label="Exposition du rendu"
-                            type="range"
-                            min="0.6"
-                            max="1.6"
-                            step="0.05"
-                            value={exposure}
-                            onChange={(e) =>
-                              setExposure(Number(e.target.value))
-                            }
-                          />
-                          <span>{exposure.toFixed(2)}</span>
-                        </label>
-                      </>
-                    }
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={transparent}
-                        onChange={(e) => setTransparent(e.target.checked)}
-                      />
-                      Murs transparents
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={ceiling}
-                        onChange={(e) => setCeiling(e.target.checked)}
-                      />
-                      Plafond
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={showLightMarkers}
-                        onChange={(e) => setShowLightMarkers(e.target.checked)}
-                      />
-                      Repères des lumières
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={quality}
-                        onChange={(e) => setQuality(e.target.checked)}
-                      />
-                      Haute qualité
-                    </label>
-                    <button
-                      onClick={() => {
-                        const c = document.querySelector("canvas");
-                        if (c)
-                          c.toBlob((b) => {
-                            if (b) download(b, "krasroom-vue.png");
-                          });
-                      }}
-                    >
-                      Capture PNG
-                    </button>
-                  </div>
-                </details>
+                        Visite sans interface · L
+                      </button>
+                      <label>
+                        Hauteur des yeux{" "}
+                        <select
+                          aria-label="Hauteur des yeux"
+                          value={eyeHeight}
+                          onChange={(e) => setEyeHeight(Number(e.target.value))}
+                        >
+                          <option value={1.4}>1,40 m</option>
+                          <option value={1.55}>1,55 m</option>
+                          <option value={1.65}>1,65 m</option>
+                          <option value={1.75}>1,75 m</option>
+                        </select>
+                      </label>
+                      <label>
+                        Champ de vision{" "}
+                        <input
+                          aria-label="Champ de vision"
+                          type="range"
+                          min="55"
+                          max="90"
+                          value={fieldOfView}
+                          onChange={(e) =>
+                            setFieldOfView(Number(e.target.value))
+                          }
+                        />
+                        <span>{fieldOfView}°</span>
+                      </label>
+                      <label>
+                        Déplacement{" "}
+                        <select
+                          aria-label="Vitesse de visite"
+                          value={walkSpeed}
+                          onChange={(e) => setWalkSpeed(Number(e.target.value))}
+                        >
+                          <option value={0.8}>Lent</option>
+                          <option value={1.4}>Normal</option>
+                          <option value={2.2}>Rapide</option>
+                        </select>
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={freeWalk}
+                          onChange={(e) => setFreeWalk(e.target.checked)}
+                        />
+                        Traverser les obstacles
+                      </label>
+                      <button
+                        className="outline"
+                        onClick={() => useTouchWalk.getState().restart()}
+                      >
+                        Revenir au départ
+                      </button>
+                      <small>
+                        La perspective change, les dimensions restent en mètres.
+                        Échap pour régler la visite.
+                      </small>
+                    </div>
+                  )}
+                  <details
+                    className="render-controls"
+                    key={view}
+                    open={view === "3d"}
+                  >
+                    <summary>
+                      <Sun size={15} />
+                      Rendu et ambiance
+                      <ChevronDown size={14} />
+                    </summary>
+                    <div className="render-controls-body">
+                      <label>
+                        Rendu{" "}
+                        <select
+                          aria-label="Style de rendu"
+                          value={realistic ? "realistic" : "standard"}
+                          onChange={(e) =>
+                            setRealistic(e.target.value === "realistic")
+                          }
+                        >
+                          <option value="standard">Standard · fluide</option>
+                          <option value="realistic">
+                            Réaliste · matières et lumière
+                          </option>
+                        </select>
+                      </label>
+                      {
+                        <>
+                          <label>
+                            Lumière{" "}
+                            <select
+                              aria-label="Ambiance lumineuse"
+                              value={lighting}
+                              onChange={(e) =>
+                                setLighting(e.target.value as LightingProfile)
+                              }
+                            >
+                              {Object.entries(lightingProfiles).map(
+                                ([id, p]) => (
+                                  <option key={id} value={id}>
+                                    {p.name}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </label>
+                          <label>
+                            Exposition{" "}
+                            <input
+                              aria-label="Exposition du rendu"
+                              type="range"
+                              min="0.6"
+                              max="1.6"
+                              step="0.05"
+                              value={exposure}
+                              onChange={(e) =>
+                                setExposure(Number(e.target.value))
+                              }
+                            />
+                            <span>{exposure.toFixed(2)}</span>
+                          </label>
+                        </>
+                      }
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={transparent}
+                          onChange={(e) => setTransparent(e.target.checked)}
+                        />
+                        Murs transparents
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={ceiling}
+                          onChange={(e) => setCeiling(e.target.checked)}
+                        />
+                        Plafond
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={showLightMarkers}
+                          onChange={(e) =>
+                            setShowLightMarkers(e.target.checked)
+                          }
+                        />
+                        Repères des lumières
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={quality}
+                          onChange={(e) => setQuality(e.target.checked)}
+                        />
+                        Haute qualité
+                      </label>
+                      <button
+                        onClick={() => {
+                          const c = document.querySelector("canvas");
+                          if (c)
+                            c.toBlob((b) => {
+                              if (b) download(b, "krasroom-vue.png");
+                            });
+                        }}
+                      >
+                        Capture PNG
+                      </button>
+                    </div>
+                  </details>
+                </div>
               </>
             )}
           </div>

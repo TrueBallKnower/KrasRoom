@@ -573,6 +573,7 @@ test("placement et déplacement directs dans la vue 3D, rotation et visite régl
     page.getByRole("button", { name: "Au sol", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Visite", exact: true }).click();
+  await page.getByRole("button", { name: "Affichage", exact: true }).click();
   await page
     .getByLabel("Hauteur des yeux", { exact: true })
     .selectOption("1.4");
@@ -1298,6 +1299,7 @@ test("L masque l’interface de visite, garde les réglages et fonctionne avec l
   await page.goto("./");
   await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Visite", exact: true }).click();
+  await page.getByRole("button", { name: "Affichage", exact: true }).click();
   await page
     .getByLabel("Hauteur des yeux", { exact: true })
     .selectOption("1.65");
@@ -1368,6 +1370,7 @@ test("la visite immersive entre et sort du plein écran natif", async ({
   await page.goto("./");
   await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Visite", exact: true }).click();
+  await page.getByRole("button", { name: "Affichage", exact: true }).click();
   await page
     .getByRole("button", { name: "Visite sans interface · L", exact: true })
     .click();

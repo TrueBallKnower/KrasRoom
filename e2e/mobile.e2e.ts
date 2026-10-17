@@ -243,6 +243,15 @@ test("visite tactile : regarder au doigt, avancer sans clavier et quitter le ple
       await page.evaluate(() => document.pointerLockElement === null),
     ).toBe(true);
     await page.getByRole("button", { name: "Affichage", exact: true }).tap();
+    await expect(stick).toBeHidden();
+    await page.getByRole("button", { name: "Affichage", exact: true }).tap();
+    await expect(stick).toBeVisible();
+    await page.setViewportSize({ width: 844, height: 390 });
+    const joystick = (await stick.boundingBox())!;
+    const toolbar = (await page.locator(".viewport-toolbar").boundingBox())!;
+    expect(joystick.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Affichage", exact: true }).tap();
     await page
       .getByRole("button", { name: "Visite sans interface · L", exact: true })
       .tap();

@@ -87,3 +87,61 @@ test("panneaux 3D : replier les réglages sans perdre leur état", async ({
     page.getByRole("button", { name: "Exporter", exact: true }),
   ).toBeInViewport({ ratio: 1 });
 });
+
+test("les panneaux restent séparés en visite et en 3D, même dans une fenêtre basse", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const display = page.getByRole("button", { name: "Affichage", exact: true });
+  const dock = page.locator(".scene-settings-dock");
+  const separated = async (a: string, b: string) => {
+    const first = await page.locator(a).boundingBox();
+    const second = await page.locator(b).boundingBox();
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    const x =
+      Math.min(first!.x + first!.width, second!.x + second!.width) -
+      Math.max(first!.x, second!.x);
+    const y =
+      Math.min(first!.y + first!.height, second!.y + second!.height) -
+      Math.max(first!.y, second!.y);
+    expect(x <= 0 || y <= 0, `${a} chevauche ${b}`).toBe(true);
+  };
+  for (const size of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 600 },
+    { width: 820, height: 768 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(size);
+    await page.getByRole("button", { name: "Visite", exact: true }).click();
+    await expect(dock).toBeHidden();
+    await expect(page.locator(".drawing-toolbar")).toBeHidden();
+    await display.click();
+    await expect(
+      page.getByLabel("Hauteur des yeux", { exact: true }),
+    ).toBeVisible();
+    await page.locator(".render-controls summary").click();
+    await separated(".visit-settings", ".render-controls");
+    await separated(".viewport-toolbar", ".scene-settings-dock");
+    const capture = dock.getByRole("button", {
+      name: "Capture PNG",
+      exact: true,
+    });
+    await capture.scrollIntoViewIfNeeded();
+    await expect(capture).toBeInViewport({ ratio: 1 });
+    await page.getByRole("button", { name: "Vue 3D", exact: true }).click();
+    if (await dock.isHidden()) await display.click();
+    await separated(".camera-toolbar", ".render-controls");
+    await separated(".viewport-toolbar", ".scene-settings-dock");
+    await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
+    await expect(page.locator(".drawing-toolbar")).toBeVisible();
+    await separated(".viewport-toolbar", ".drawing-toolbar");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
+});
