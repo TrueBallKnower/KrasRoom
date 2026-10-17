@@ -84,3 +84,36 @@ export function visitStart(p: Project, eyeHeight = 1.55): Point {
   }
   return best || p.rooms[0]?.points[0] || p.walls[0]?.a || { x: 2, y: 2 };
 }
+
+/** Ceiling follows full-height boundary walls; short partitions do not lower it. */
+export function roomCeilingHeight(
+  room: import("./model").Room,
+  walls: Wall[],
+): number {
+  const boundary = walls.filter((w) =>
+    room.points.some((a, index) => {
+      const b = room.points[(index + 1) % room.points.length];
+      const dx = b.x - a.x,
+        dy = b.y - a.y,
+        len = Math.hypot(dx, dy),
+        wl = distance(w.a, w.b);
+      if (len < 0.001 || wl < 0.001) return false;
+      const cross = (w.b.x - w.a.x) * dy - (w.b.y - w.a.y) * dx;
+      if (Math.abs(cross) / (len * wl) > 0.01) return false;
+      if (
+        Math.abs((w.a.x - a.x) * dy - (w.a.y - a.y) * dx) / len >
+        w.thickness / 2 + 0.03
+      )
+        return false;
+      const t0 = ((w.a.x - a.x) * dx + (w.a.y - a.y) * dy) / len;
+      const t1 = ((w.b.x - a.x) * dx + (w.b.y - a.y) * dy) / len;
+      return (
+        Math.min(len, Math.max(t0, t1)) - Math.max(0, Math.min(t0, t1)) > 0.01
+      );
+    }),
+  );
+  return Math.max(
+    ...(boundary.length ? boundary : walls).map((w) => w.height),
+    ...(walls.length ? [] : [2.6]),
+  );
+}

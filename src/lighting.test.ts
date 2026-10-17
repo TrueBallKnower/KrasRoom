@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createLight, shadowSourceIds, roomLightPoint } from "./lightSources";
 import { lightingProfiles, validLightSettings, MAX_LIGHTS } from "./lighting";
 import { demo, validateProject, collides } from "./model";
-import { inside } from "./spatial";
+import { inside, roomCeilingHeight } from "./spatial";
 import { exportProject, importProject, saveProject, projects } from "./db";
 import "fake-indexeddb/auto";
 describe("Éclairage des appartements", () => {
@@ -80,4 +80,22 @@ describe("Éclairage des appartements", () => {
     p.items.push(light);
     expect(collides(light, p)).toBe(false);
   });
+});
+
+it("adapte la hauteur du plafond aux murs de la pièce, sans prendre les murs perpendiculaires d’une autre pièce", () => {
+  const p = demo(),
+    room = p.rooms[0];
+  p.walls.forEach((w) => (w.height = 3));
+  expect(roomCeilingHeight(room, p.walls)).toBe(3);
+  p.walls.push({
+    id: "taller",
+    a: { x: 5, y: 0 },
+    b: { x: 6, y: 1 },
+    height: 4,
+    thickness: 0.15,
+    color: "#ffffff",
+    openings: [],
+  });
+  expect(roomCeilingHeight(room, p.walls)).toBe(3);
+  expect(roomCeilingHeight(room, [])).toBe(2.6);
 });

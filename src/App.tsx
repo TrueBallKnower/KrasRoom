@@ -1,3 +1,4 @@
+import { roomCeilingHeight } from "./spatial";
 import { LightingPanel, LightInspector } from "./LightingPanel";
 import ArchitecturePanel from "./ArchitecturePanel";
 import { createLight, roomLightPoint, type lightPresets } from "./lightSources";
@@ -203,6 +204,11 @@ export default function App() {
     const room = p.rooms.find((r) => r.id === roomId);
     const point = room ? roomLightPoint(room) : visitStart(p);
     const source = createLight(preset);
+    if (room)
+      source.elevation = Math.min(
+        source.elevation || 0,
+        Math.max(0, roomCeilingHeight(room, p.walls) - 0.25),
+      );
     add(source, point);
     setView("3d");
     setHide(false);

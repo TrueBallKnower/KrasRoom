@@ -1,6 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 
 async function selectLivingRoomFloor(page: Page) {
+  // On reload the demo is briefly visible before IndexedDB replaces its room
+  // nodes. Wait for the restored project, not just that transient polygon.
+  await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
   // Click a clear floor area, away from the floating tools and the imported
   // furniture at the room label. Scale with the room rather than the window.
   const floor = page.locator(".plan-svg polygon").first();

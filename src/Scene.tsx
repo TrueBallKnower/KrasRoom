@@ -46,7 +46,7 @@ import { finishDefinition } from "./floorFinishes";
 import { surfaceMaps, useSurfaceMaps } from "./materials";
 import { magneticPlacement, type AlignmentGuide } from "./placement";
 import { wallPlacement } from "./wallPlacement";
-import { wallOutline } from "./spatial";
+import { wallOutline, roomCeilingHeight } from "./spatial";
 import NavigationCamera from "./NavigationCamera";
 import { useNavigation } from "./navigation";
 import {
@@ -461,6 +461,7 @@ function WallMesh({
   );
 }
 function Floor({ r, ceiling }: { r: Room; ceiling?: boolean }) {
+  const walls = useStore((s) => s.project.walls);
   const select = useStore((s) => s.select);
   const realistic = useContext(RealismContext);
   const finish = r.finish || "plain";
@@ -480,7 +481,7 @@ function Floor({ r, ceiling }: { r: Room; ceiling?: boolean }) {
   return (
     <mesh
       rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, ceiling ? 2.6 : 0, 0]}
+      position={[0, ceiling ? roomCeilingHeight(r, walls) : 0, 0]}
       onClick={(e) => {
         if (!ceiling && !document.pointerLockElement) {
           e.stopPropagation();
