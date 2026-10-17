@@ -126,8 +126,10 @@
 .app .day-night-switch button[aria-pressed="true"],
 [data-theme="dark"] .app .day-night-switch button[aria-pressed="true"],
 .studio-workspace .primary,
-.studio-workspace .studio-save,
-.studio-workspace .studio-tools button[aria-pressed="true"] {
+.studio-workspace .studio-use,
+.studio-workspace .studio-brand > span,
+.studio-workspace .workshop-tabs button[aria-pressed="true"],
+.studio-workspace .studio-transform-tools button[aria-pressed="true"] {
   background: var(--action);
   color: var(--action-ink);
   border: 1px solid var(--action);
