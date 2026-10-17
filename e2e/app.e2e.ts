@@ -1,4 +1,20 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+async function selectLivingRoomFloor(page: Page) {
+  // Click a clear floor area, away from the floating tools and the imported
+  // furniture at the room label. Scale with the room rather than the window.
+  const floor = page.locator(".plan-svg polygon").first();
+  await expect(floor).toBeVisible();
+  const bounds = await floor.boundingBox();
+  expect(bounds).not.toBeNull();
+  await floor.click({
+    position: { x: bounds!.width * 0.2, y: bounds!.height * 0.8 },
+  });
+  await expect(
+    page.getByRole("heading", { name: "Votre pièce", exact: true }),
+  ).toBeVisible();
+}
+
 test("édition, annuler/rétablir, persistance et export complet", async ({
   page,
 }) => {
@@ -641,10 +657,7 @@ test("ZIP glTF texturé, rendu réaliste et parquet conservés dans la sauvegard
     .getByLabel("Style de rendu", { exact: true })
     .selectOption("realistic");
   await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
-  await page
-    .locator(".plan-svg polygon")
-    .first()
-    .click({ position: { x: 40, y: 40 } });
+  await selectLivingRoomFloor(page);
   await page
     .getByRole("button", { name: "Parquet chêne naturel", exact: true })
     .click();
@@ -1182,10 +1195,7 @@ test("matériaux, palette et roue chromatique se sauvegardent et se rendent en 3
   await page
     .getByRole("button", { name: "Appliquer à tous les murs", exact: true })
     .click();
-  await page
-    .locator(".plan-svg polygon")
-    .first()
-    .click({ position: { x: 40, y: 40 } });
+  await selectLivingRoomFloor(page);
   await page
     .getByRole("button", { name: "Chêne en chevrons", exact: true })
     .click();
@@ -1258,10 +1268,7 @@ test("matériaux, palette et roue chromatique se sauvegardent et se rendent en 3
   await page.getByRole("button", { name: "Plan 2D", exact: true }).click();
   await expect(page.getByText("Enregistré", { exact: true })).toBeVisible();
   await page.reload();
-  await page
-    .locator(".plan-svg polygon")
-    .first()
-    .click({ position: { x: 40, y: 40 } });
+  await selectLivingRoomFloor(page);
   await expect(
     page.getByRole("button", { name: "Chêne en chevrons", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
